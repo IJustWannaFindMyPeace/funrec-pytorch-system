@@ -1,0 +1,48 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Conda
+.conda/
+
+# Frontend
+node_modules/
+dist/
+coverage/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary files
+_build/
+tmp/
+tmp_bak/
+*.bkp
+*.dtmp
+
+# Data and generated artifacts
+data/
+processed_data/
+artifacts/
+models/
+*.pt
+*.pth
+*.npy
+*.npz
+
+# Logs
+*.log
