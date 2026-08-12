@@ -21,6 +21,12 @@ def load_raw_data():
     try:
         df_movies = pd.read_pickle(config.DATASET_DIR / "movies.pkl")
         df_ratings = pd.read_pickle(config.DATASET_DIR / "ratings.pkl")
+        df_ratings = df_ratings.copy()
+        df_ratings["timestamp"] = pd.to_numeric(
+            df_ratings["timestamp"],
+            errors="raise",
+        ).astype(np.int64)
+        df_ratings["_source_row"] = np.arange(len(df_ratings), dtype=np.int64)
         df_users = pd.read_pickle(config.DATASET_DIR / "users.pkl")
         return df_movies, df_ratings, df_users
     except FileNotFoundError:
@@ -43,7 +49,13 @@ def process_features(df_movies, df_ratings, df_users):
     # 选择列
     user_columns = ["user_id", "gender", "age", "occupation", "zip_code"]
     movie_columns = ["movie_id", "originalTitle", "description", "genres", "isAdult", "startYear", "runtimeMinutes", "averageRating", "numVotes"]
-    ratings_columns = ["user_id", "movie_id", "rating", "timestamp"]
+    ratings_columns = [
+        "user_id",
+        "movie_id",
+        "rating",
+        "timestamp",
+        "_source_row",
+    ]
 
     df_users = df_users[user_columns]
     df_movies = df_movies[movie_columns].rename(columns={"originalTitle": "title"})
@@ -157,7 +169,11 @@ def generate_train_eval_samples(
     Returns:
         包含 train 和 test 数据的字典
     """
-    data_df.sort_values("timestamp", inplace=True)
+    data_df.sort_values(
+        ["timestamp", "_source_row"],
+        kind="stable",
+        inplace=True,
+    )
     train_data_dict = defaultdict(list)
     test_data_dict = defaultdict(list)
     
