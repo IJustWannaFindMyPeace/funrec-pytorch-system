@@ -1,4 +1,7 @@
 """Training utilities for the PyTorch YouTubeDNN model."""
+from itertools import islice
+
+from tqdm.auto import tqdm
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +46,34 @@ def move_batch_to_device(
     moved_targets = targets.to(device, non_blocking=True)
     return moved_features, moved_targets
 
+def build_progress_iterator(
+    data_loader: Iterable,
+    max_batches: Optional[int],
+    description: Optional[str],
+):
+    """Limit a loader and optionally display batch progress."""
+    iterator = iter(data_loader)
+
+    try:
+        total_batches = len(data_loader)
+    except TypeError:
+        total_batches = None
+
+    if max_batches is not None:
+        iterator = islice(iterator, max_batches)
+        total_batches = (
+            min(total_batches, max_batches)
+            if total_batches is not None
+            else max_batches
+        )
+
+    return tqdm(
+        iterator,
+        total=total_batches,
+        desc=description,
+        leave=True,
+        disable=description is None,
+    )
 
 def train_one_epoch(
     model: nn.Module,
@@ -50,6 +81,7 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     max_batches: Optional[int] = None,
+    progress_description: Optional[str] = None,
 ) -> TrainingStats:
     """Train for one pass, optionally stopping after a fixed batch count."""
     if max_batches is not None and max_batches <= 0:
@@ -61,9 +93,13 @@ def train_one_epoch(
     total_examples = 0
     total_batches = 0
 
-    for batch_index, (features, targets) in enumerate(data_loader):
-        if max_batches is not None and batch_index >= max_batches:
-            break
+    progress = build_progress_iterator(
+        data_loader,
+        max_batches,
+        progress_description,
+    )
+
+    for batch_index, (features, targets) in enumerate(progress):
 
         features, targets = move_batch_to_device(
             features,
@@ -87,6 +123,9 @@ def train_one_epoch(
         total_loss += loss.detach().item() * batch_size
         total_examples += batch_size
         total_batches += 1
+        progress.set_postfix(
+            loss=f"{total_loss / total_examples:.4f}"
+        )
 
     if total_batches == 0:
         raise ValueError("The data loader produced no training batches")
@@ -103,6 +142,7 @@ def evaluate_loss(
     data_loader: Iterable,
     device: torch.device,
     max_batches: Optional[int] = None,
+    progress_description: Optional[str] = None,
 ) -> TrainingStats:
     """Evaluate average full-softmax loss without updating the model."""
     if max_batches is not None and max_batches <= 0:
@@ -114,9 +154,13 @@ def evaluate_loss(
     total_examples = 0
     total_batches = 0
 
-    for batch_index, (features, targets) in enumerate(data_loader):
-        if max_batches is not None and batch_index >= max_batches:
-            break
+    progress = build_progress_iterator(
+        data_loader,
+        max_batches,
+        progress_description,
+    )
+
+    for batch_index, (features, targets) in enumerate(progress):
 
         features, targets = move_batch_to_device(
             features,
@@ -135,6 +179,9 @@ def evaluate_loss(
         total_loss += loss.item() * batch_size
         total_examples += batch_size
         total_batches += 1
+        progress.set_postfix(
+            loss=f"{total_loss / total_examples:.4f}"
+        )
 
     if total_batches == 0:
         raise ValueError("The data loader produced no evaluation batches")

@@ -303,12 +303,14 @@ def run_retrieval_training(
             optimizer=optimizer,
             device=device,
             max_batches=max_train_batches,
+            progress_description=f"Train {epoch}/{epochs}",
         )
         validation_stats = evaluate_loss(
             model=model,
             data_loader=validation_loader,
             device=device,
             max_batches=max_eval_batches,
+            progress_description=f"Eval {epoch}/{epochs}",
         )
 
         improved = (
