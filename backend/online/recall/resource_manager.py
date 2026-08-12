@@ -1,179 +1,283 @@
-"""
-召回模型资源管理器
+"""PyTorch retrieval resource manager for online recall."""
 
-负责从本地共享目录加载召回模型和词表。
-实现单例模式以避免重复加载模型。
-
-注意：TensorFlow 采用懒加载方式导入，以避免模块加载时的递归错误。
-"""
-
-import os
-import json
-import pickle
 import logging
+import os
+import pickle
 from pathlib import Path
+from threading import Lock
+from typing import Any
 
+# Import torch before NumPy/scikit-learn on Windows.
+import torch
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
-from app.config import settings
+from modeling.youtubednn import YouTubeDNN
 
-# 配置日志
+
 logger = logging.getLogger(__name__)
 
 
-def _get_custom_objects(tf_module) -> dict:
-    """
-    懒加载 TensorFlow 模型所需的自定义对象。
-    
-    Args:
-        tf_module: 已导入的 TensorFlow 模块，确保 TF 先被加载
-    """
-    try:
-        # TF 必须在导入 funrec（funrec 也会导入 TF）之前完全加载
-        # 这样可以避免 TF 懒加载器的递归问题
-        from funrec.models.layers import DNNs, L2NormalizeLayer
-        return {"DNNs": DNNs, "L2NormalizeLayer": L2NormalizeLayer}
-    except ImportError as e:
-        logger.warning(f"无法导入 funrec 自定义层: {e}")
-        return {}
-
-
 class RecallResourceManager:
-    """
-    召回模型的单例资源管理器。
-    
-    注意：资源采用懒加载方式，在首次访问时才加载，以避免启动时的 TF 导入问题。
-    """
+    """Lazily load shared PyTorch retrieval artifacts."""
+
     _instance = None
-    
+    _instance_lock = Lock()
+
     def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(RecallResourceManager, cls).__new__(cls)
-            cls._instance.initialized = False
+        with cls._instance_lock:
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+                cls._instance.initialized = False
         return cls._instance
 
     def __init__(self):
         if self.initialized:
             return
-            
-        # 模型部署目录配置
-        self.deploy_dir = Path(os.getenv("MODEL_DEPLOY_DIR", "/app/tmp/web_project/deployed_models"))
-        
+
+        self.deploy_dir = Path(
+            os.getenv(
+                "MODEL_DEPLOY_DIR",
+                "/app/tmp/web_project/deployed_models",
+            )
+        )
+        self.recall_dir = self.deploy_dir / "recall"
+
+        requested_device = os.getenv("RECALL_DEVICE", "cpu").lower()
+        if requested_device == "cuda" and not torch.cuda.is_available():
+            logger.warning(
+                "RECALL_DEVICE=cuda，但 CUDA 不可用，回退到 CPU"
+            )
+            requested_device = "cpu"
+
+        self.device = torch.device(requested_device)
+
         self.user_model = None
         self.encoders = {}
         self.all_movie_ids = []
+        self.item_embeddings = None
         self.item_embedding_matrix = None
+        self.item_embedding_tensor = None
         self.movie_genre_map = {}
-        
-        # 跟踪加载状态 - 资源在首次访问时懒加载
+
         self._resources_loaded = False
+        self._load_lock = Lock()
         self.initialized = True
-        
-    def _ensure_resources_loaded(self):
-        """在首次访问时懒加载资源。"""
-        if not self._resources_loaded:
-            self.load_resources()
-            self._resources_loaded = True
 
-    def load_resources(self):
-        logger.info(f"从本地目录加载召回资源: {self.deploy_dir}")
-        
-        # 1. 加载词表
+    def _ensure_resources_loaded(self) -> bool:
+        """Load resources once and report whether they are ready."""
+        if self._resources_loaded:
+            return True
+
+        with self._load_lock:
+            if self._resources_loaded:
+                return True
+
+            self._resources_loaded = self.load_resources()
+
+        return self._resources_loaded
+
+    def load_resources(self) -> bool:
+        """Load and validate all deployed retrieval artifacts."""
+        logger.info(
+            "从本地目录加载 PyTorch 召回资源: %s",
+            self.recall_dir,
+        )
+
+        vocab_path = self.recall_dir / "vocab_dict.pkl"
+        embedding_path = self.recall_dir / "item_embeddings.npy"
+        movie_ids_path = self.recall_dir / "movie_ids.npy"
+        model_path = self.recall_dir / "retrieval_user_model.pt"
+
+        required_paths = (
+            vocab_path,
+            embedding_path,
+            movie_ids_path,
+            model_path,
+        )
+        missing_paths = [
+            path for path in required_paths if not path.is_file()
+        ]
+
+        if missing_paths:
+            logger.error(
+                "召回工件缺失: %s",
+                ", ".join(str(path) for path in missing_paths),
+            )
+            return False
+
         try:
-            vocab_path = self.deploy_dir / "vocab_dict.pkl"
-            logger.info(f"加载 vocab_dict.pkl: {vocab_path}")
-            
-            with open(vocab_path, "rb") as f:
-                vocab_dict = pickle.load(f)
-            
+            with open(vocab_path, "rb") as file:
+                vocab_dict = pickle.load(file)
+
+            encoders = {}
             for feature_name, classes in vocab_dict.items():
-                le = LabelEncoder()
-                le.classes_ = classes if isinstance(classes, np.ndarray) else np.array(classes)
-                self.encoders[feature_name] = le
-                
-                if feature_name == "movie_id":
-                    self.all_movie_ids = list(le.classes_)
-            logger.info("  -> 词表加载完成。")
-        except Exception as e:
-            logger.error(f"加载词表时出错: {e}")
+                encoder = LabelEncoder()
+                encoder.classes_ = np.asarray(classes)
+                encoders[feature_name] = encoder
 
-        # 2. 加载物品 Embedding
-        try:
-            emb_path = self.deploy_dir / "item_embeddings.npy"
-            logger.info(f"加载物品 Embedding: {emb_path}")
-            
-            self.item_embeddings = np.load(emb_path)
-            
-            # 设置带填充位的 Embedding 矩阵
-            dim = self.item_embeddings.shape[1]
-            self.item_embedding_matrix = np.zeros((self.item_embeddings.shape[0] + 1, dim), dtype=np.float32)
-            self.item_embedding_matrix[1:] = self.item_embeddings
-            
-            logger.info(f"  -> 物品 Embedding 加载完成。形状: {self.item_embedding_matrix.shape}")
-            
-        except Exception as e:
-            logger.error(f"加载物品 Embedding 时出错: {e}")
+            item_embeddings = np.load(
+                embedding_path,
+                allow_pickle=False,
+            ).astype(np.float32, copy=False)
+            movie_ids = np.load(
+                movie_ids_path,
+                allow_pickle=False,
+            )
+
+            artifact = torch.load(
+                model_path,
+                map_location="cpu",
+                weights_only=True,
+            )
+
+            feature_dict = artifact["feature_dict"]
+            embedding_dim = int(artifact["embedding_dim"])
+
+            if item_embeddings.ndim != 2:
+                raise ValueError(
+                    "item_embeddings must be two-dimensional"
+                )
+
+            if len(movie_ids) != len(item_embeddings):
+                raise ValueError(
+                    "movie_ids and item_embeddings are misaligned"
+                )
+
+            if item_embeddings.shape[1] != embedding_dim:
+                raise ValueError(
+                    "item embedding dimension does not match model"
+                )
+
+            expected_item_count = feature_dict["movie_id"] - 1
+            if len(item_embeddings) != expected_item_count:
+                raise ValueError(
+                    "item count does not match model feature_dict"
+                )
+
+            movie_encoder = encoders.get("movie_id")
+            if movie_encoder is None:
+                raise ValueError(
+                    "movie_id encoder is missing from vocabulary"
+                )
+
+            if len(movie_encoder.classes_) != len(movie_ids):
+                raise ValueError(
+                    "movie vocabulary and movie_ids are misaligned"
+                )
+
+            model = YouTubeDNN(
+                feature_dict=feature_dict,
+                embedding_dim=embedding_dim,
+            )
+            model.load_state_dict(artifact["model_state_dict"])
+            model.to(self.device)
+            model.eval()
+
+            padded_embeddings = np.zeros(
+                (
+                    len(item_embeddings) + 1,
+                    embedding_dim,
+                ),
+                dtype=np.float32,
+            )
+            padded_embeddings[1:] = item_embeddings
+
+            self.encoders = encoders
+            self.all_movie_ids = movie_ids.tolist()
+            self.item_embeddings = item_embeddings
+            self.item_embedding_matrix = padded_embeddings
+            self.item_embedding_tensor = torch.from_numpy(
+                padded_embeddings
+            ).to(self.device)
+            self.user_model = model
+
+            logger.info(
+                "PyTorch 召回资源加载完成，设备=%s，物品向量形状=%s",
+                self.device,
+                self.item_embedding_matrix.shape,
+            )
+            return True
+
+        except Exception:
+            logger.exception("加载 PyTorch 召回资源失败")
+            self.user_model = None
+            self.encoders = {}
+            self.all_movie_ids = []
+            self.item_embeddings = None
             self.item_embedding_matrix = None
+            self.item_embedding_tensor = None
+            return False
 
-        # 3. 加载用户模型
-        try:
-            # 检查当前激活的版本
-            active_json_path = self.deploy_dir / "model" / "user_recall" / "active.json"
+    def encode_feature(
+        self,
+        feature_name: str,
+        raw_value: Any,
+    ) -> int:
+        """Encode a raw value, reserving encoded ID 0 for unknowns."""
+        encoder = self.encoders.get(feature_name)
+        if encoder is None or raw_value is None:
+            return 0
+
+        classes = encoder.classes_
+        candidates = [raw_value]
+
+        if classes.dtype.kind in {"U", "S", "O"}:
+            candidates.append(str(raw_value))
+        elif classes.dtype.kind in {"i", "u"}:
             try:
-                with open(active_json_path, "r") as f:
-                    version_info = json.load(f)
-                model_rel_path = version_info.get("path")
-            except:
-                logger.warning("无法找到激活的模型版本，尝试使用默认路径")
-                model_rel_path = "model/user_recall/v1/user_model"
+                candidates.append(int(raw_value))
+            except (TypeError, ValueError):
+                pass
 
-            if model_rel_path:
-                model_path = self.deploy_dir / model_rel_path
-                
-                if not model_path.exists():
-                    logger.error(f"模型目录不存在: {model_path}")
-                    return
-                
-                logger.info(f"从 {model_path} 加载用户模型...")
-                # 先导入 TensorFlow，然后获取自定义对象（会导入 funrec）
-                # 这个顺序可以防止 TF 懒加载器的递归问题
-                import tensorflow as tf
-                custom_objects = _get_custom_objects(tf)
-                
-                # 先尝试使用自定义对象加载，失败则使用 compile=False
-                try:
-                    self.user_model = tf.keras.models.load_model(model_path, custom_objects=custom_objects)
-                except Exception as load_err:
-                    logger.warning(f"使用自定义对象加载失败: {load_err}，尝试使用 compile=False")
-                    self.user_model = tf.keras.models.load_model(model_path, compile=False)
-                logger.info(f"  -> 用户模型加载完成。")
-            else:
-                logger.warning("未找到激活的模型路径。")
-        except Exception as e:
-             logger.error(f"加载用户模型时出错: {e}")
+        for candidate in candidates:
+            try:
+                return int(encoder.transform([candidate])[0]) + 1
+            except (TypeError, ValueError):
+                continue
+
+        return 0
 
     def set_movie_genre_map(self, movie_db_objects):
-        """从数据库对象填充电影类型映射表"""
-        genre_le = self.encoders.get("genres")
-        if not genre_le:
+        """Build the raw movie ID to encoded genre ID mapping."""
+        if not self._ensure_resources_loaded():
+            logger.warning(
+                "召回资源未就绪，无法构建电影类型映射"
+            )
+            return
+
+        genre_encoder = self.encoders.get("genres")
+        if genre_encoder is None:
             return
 
         for movie in movie_db_objects:
-            raw_mid = movie.movie_id 
+            raw_movie_id = movie.movie_id
+            encoded_genres = []
+
             try:
-                if hasattr(movie, 'genres') and movie.genres:
-                    # 处理 genres 为字符串或列表的情况
-                    genres = movie.genres if isinstance(movie.genres, list) else str(movie.genres).split('|')
-                    # 过滤出编码器中存在的类型
-                    valid_genres = [g for g in genres if g in genre_le.classes_]
-                    if valid_genres:
-                        encoded_genres = genre_le.transform(valid_genres) + 1
-                        self.movie_genre_map[raw_mid] = encoded_genres
-                    else:
-                        self.movie_genre_map[raw_mid] = []
-                else:
-                     self.movie_genre_map[raw_mid] = []
-            except Exception as e:
-                 logger.debug(f"映射电影 {raw_mid} 的类型时出错: {e}")
-                 self.movie_genre_map[raw_mid] = []
+                if getattr(movie, "genres", None):
+                    raw_genres = (
+                        movie.genres
+                        if isinstance(movie.genres, list)
+                        else str(movie.genres).split("|")
+                    )
+
+                    encoded_genres = [
+                        encoded
+                        for genre in raw_genres
+                        if (
+                            encoded := self.encode_feature(
+                                "genres",
+                                genre,
+                            )
+                        )
+                        > 0
+                    ]
+            except Exception as error:
+                logger.debug(
+                    "映射电影 %s 的类型时出错: %s",
+                    raw_movie_id,
+                    error,
+                )
+
+            self.movie_genre_map[raw_movie_id] = encoded_genres

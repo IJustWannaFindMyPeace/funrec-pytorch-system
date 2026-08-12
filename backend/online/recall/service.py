@@ -44,11 +44,11 @@ class RecallService:
             self.redis_client = None
             
         # 初始化召回策略
-        self.strategies: List[RecallStrategy] = [                                    
+        self.strategies: List[RecallStrategy] = [
             UserPreferenceRecallStrategy(),
+            YouTubeDNNRecallStrategy(),
             # ItemEmbeddingRecallStrategy(),
             # GlobalTrendingRecallStrategy(),
-            # YouTubeDNNRecallStrategy(),
         ]
         
         self.initialized = True
