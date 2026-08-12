@@ -121,6 +121,40 @@ class YouTubeDNN(nn.Module):
         item_embedding = self.movie_embedding(movie_ids.long())
         return F.normalize(item_embedding, p=2, dim=-1)
 
+    def compute_full_logits(
+        self,
+        features: Dict[str, Tensor],
+    ) -> Tensor:
+        """Compute logits against every non-padding movie class."""
+        user_embedding = self.encode_user(features)
+
+        # Keep the training behavior of the original implementation:
+        # normalized user vectors against raw movie embedding weights.
+        item_weights = self.movie_embedding.weight[1:]
+
+        return user_embedding @ item_weights.transpose(0, 1)
+
+    def compute_full_softmax_loss(
+        self,
+        features: Dict[str, Tensor],
+        movie_ids: Tensor,
+    ) -> Tensor:
+        """Compute exact softmax loss over all non-padding movies."""
+        movie_ids = movie_ids.long()
+
+        if torch.any(movie_ids <= 0):
+            raise ValueError("movie_ids must not contain padding ID 0")
+
+        if torch.any(movie_ids >= self.feature_dict["movie_id"]):
+            raise ValueError("movie_ids contain an out-of-range class ID")
+
+        logits = self.compute_full_logits(features)
+
+        # Logit column 0 represents encoded movie ID 1.
+        targets = movie_ids - 1
+
+        return F.cross_entropy(logits, targets)
+
     def forward(
         self,
         features: Dict[str, Tensor],

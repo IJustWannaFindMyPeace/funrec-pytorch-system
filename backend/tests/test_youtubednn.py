@@ -135,3 +135,51 @@ def test_padding_rows_remain_zero_after_optimizer_step():
             embedding.weight[0],
             torch.zeros(16),
         )
+
+def test_full_logits_exclude_padding_class():
+    model = YouTubeDNN(FEATURE_DICT, embedding_dim=16)
+    features = build_features()
+
+    logits = model.compute_full_logits(features)
+
+    assert logits.shape == (
+        2,
+        FEATURE_DICT["movie_id"] - 1,
+    )
+
+
+def test_full_softmax_loss_is_finite_and_updates_movie_embeddings():
+    model = YouTubeDNN(FEATURE_DICT, embedding_dim=16)
+    features = build_features()
+    movie_ids = torch.tensor([3, 7])
+
+    loss = model.compute_full_softmax_loss(features, movie_ids)
+
+    assert loss.ndim == 0
+    assert torch.isfinite(loss)
+
+    loss.backward()
+
+    assert model.movie_embedding.weight.grad is not None
+    assert torch.count_nonzero(
+        model.movie_embedding.weight.grad[1:]
+    ) > 0
+    assert torch.equal(
+        model.movie_embedding.weight.grad[0],
+        torch.zeros(16),
+    )
+
+
+def test_full_softmax_loss_rejects_padding_target():
+    model = YouTubeDNN(FEATURE_DICT, embedding_dim=16)
+    features = build_features()
+
+    try:
+        model.compute_full_softmax_loss(
+            features,
+            torch.tensor([0, 7]),
+        )
+    except ValueError as error:
+        assert "padding ID 0" in str(error)
+    else:
+        raise AssertionError("padding target should raise ValueError")
