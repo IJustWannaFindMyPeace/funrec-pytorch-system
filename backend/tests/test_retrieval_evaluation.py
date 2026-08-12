@@ -4,6 +4,7 @@ from torch import nn
 
 from offline.evaluation.retrieval import (
     calculate_single_target_metrics,
+    recommend_popular_top_k,
     recommend_top_k,
 )
 
@@ -103,3 +104,42 @@ def test_metrics_reject_insufficient_recommendations():
             torch.tensor([1]),
             k_values=(5,),
         )
+
+def test_popularity_recommendations_exclude_padding_and_history():
+    popularity = torch.tensor(
+        [1000.0, 100.0, 90.0, 80.0, 70.0]
+    )
+    histories = torch.tensor(
+        [
+            [1, 0, 0],
+            [2, 1, 0],
+        ]
+    )
+
+    recommendations = recommend_popular_top_k(
+        popularity=popularity,
+        history_ids=histories,
+        k=2,
+    )
+
+    assert recommendations.tolist() == [
+        [2, 3],
+        [3, 4],
+    ]
+
+
+def test_popularity_recommendations_handle_duplicate_history():
+    popularity = torch.tensor(
+        [0.0, 100.0, 90.0, 80.0]
+    )
+    histories = torch.tensor(
+        [[1, 1, 0]]
+    )
+
+    recommendations = recommend_popular_top_k(
+        popularity=popularity,
+        history_ids=histories,
+        k=2,
+    )
+
+    assert recommendations.tolist() == [[2, 3]]

@@ -55,6 +55,61 @@ def recommend_top_k(
     # Column 0 corresponds to encoded movie ID 1.
     return torch.topk(scores, k=k, dim=1).indices + 1
 
+def recommend_popular_top_k(
+    popularity: Tensor,
+    history_ids: Tensor,
+    k: int,
+) -> Tensor:
+    """Recommend globally popular encoded IDs, excluding history."""
+    if popularity.ndim != 1:
+        raise ValueError("popularity must be one-dimensional")
+
+    if history_ids.ndim != 2:
+        raise ValueError("history_ids must be two-dimensional")
+
+    item_count = popularity.shape[0] - 1
+
+    if item_count <= 0:
+        raise ValueError(
+            "popularity must include padding and item classes"
+        )
+
+    if k <= 0:
+        raise ValueError("k must be greater than zero")
+
+    if k > item_count:
+        raise ValueError("k must not exceed the number of items")
+
+    scores = popularity.to(torch.float32).unsqueeze(0).expand(
+        history_ids.shape[0],
+        -1,
+    ).clone()
+
+    # Encoded class 0 is padding and must never be recommended.
+    scores[:, 0] = float("-inf")
+
+    valid_history = (
+        (history_ids > 0)
+        & (history_ids <= item_count)
+    )
+
+    history_mask = torch.zeros_like(
+        scores,
+        dtype=torch.int32,
+    )
+    history_mask.scatter_add_(
+        1,
+        history_ids.clamp(min=0, max=item_count),
+        valid_history.to(torch.int32),
+    )
+
+    scores = scores.masked_fill(
+        history_mask > 0,
+        float("-inf"),
+    )
+
+    # Score columns directly correspond to encoded movie IDs.
+    return torch.topk(scores, k=k, dim=1).indices
 
 def calculate_single_target_metrics(
     recommendations: Tensor,
