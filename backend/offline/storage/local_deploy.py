@@ -51,27 +51,25 @@ def deploy_recall_models(deploy_dir: Path):
     else:
         print("  ✗ movie_ids.npy 不存在")
         
-    # 3. 用户模型 (YoutubeDNN)
-    user_model_path = config.SAVED_MODELS_DIR / "user_model"
+    # 3. PyTorch 用户塔模型
+    user_model_path = (
+        config.SAVED_MODELS_DIR / "retrieval_user_model.pt"
+    )
+    deployed_user_model_path = (
+        recall_dir / "retrieval_user_model.pt"
+    )
+
     if user_model_path.exists():
-        model_deploy_dir = deploy_dir / "model" / "user_recall" / "v1"
-        model_deploy_dir.mkdir(parents=True, exist_ok=True)
-        
-        # 复制整个模型目录
-        dest_model_path = model_deploy_dir / "user_model"
-        if dest_model_path.exists():
-            shutil.rmtree(dest_model_path)
-        shutil.copytree(user_model_path, dest_model_path)
-        
-        # 更新活跃版本指针
-        version_info = {"version": "v1", "path": "model/user_recall/v1/user_model"}
-        active_json_path = deploy_dir / "model" / "user_recall" / "active.json"
-        active_json_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(active_json_path, "w") as f:
-            json.dump(version_info, f)
-        print("  ✓ 复制了 User Recall Model (YoutubeDNN)")
+        shutil.copy2(
+            user_model_path,
+            deployed_user_model_path,
+        )
+        print("  ✓ 复制了 retrieval_user_model.pt")
     else:
-        print("  ✗ User model 不存在")
+        print(
+            "  ✗ PyTorch 用户模型不存在: "
+            f"{user_model_path}"
+        )
 
 
 def deploy_ranking_models(deploy_dir: Path):
