@@ -97,6 +97,53 @@ def train_one_epoch(
         batches=total_batches,
     )
 
+@torch.no_grad()
+def evaluate_loss(
+    model: nn.Module,
+    data_loader: Iterable,
+    device: torch.device,
+    max_batches: Optional[int] = None,
+) -> TrainingStats:
+    """Evaluate average full-softmax loss without updating the model."""
+    if max_batches is not None and max_batches <= 0:
+        raise ValueError("max_batches must be greater than zero")
+
+    model.eval()
+
+    total_loss = 0.0
+    total_examples = 0
+    total_batches = 0
+
+    for batch_index, (features, targets) in enumerate(data_loader):
+        if max_batches is not None and batch_index >= max_batches:
+            break
+
+        features, targets = move_batch_to_device(
+            features,
+            targets,
+            device,
+        )
+
+        loss = model.compute_full_softmax_loss(features, targets)
+
+        if not torch.isfinite(loss):
+            raise FloatingPointError(
+                f"Non-finite evaluation loss at batch {batch_index}"
+            )
+
+        batch_size = targets.shape[0]
+        total_loss += loss.item() * batch_size
+        total_examples += batch_size
+        total_batches += 1
+
+    if total_batches == 0:
+        raise ValueError("The data loader produced no evaluation batches")
+
+    return TrainingStats(
+        loss=total_loss / total_examples,
+        examples=total_examples,
+        batches=total_batches,
+    )
 
 def save_checkpoint(
     path: Path,

@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from modeling.youtubednn import YouTubeDNN
 from offline.training.retrieval_data import RetrievalDataset
 from offline.training.retrieval_trainer import (
+    evaluate_loss,
     load_checkpoint,
     move_batch_to_device,
     resolve_device,
@@ -166,3 +167,54 @@ def test_checkpoint_round_trip_restores_model_and_optimizer(tmp_path):
 
     for name, value in model.state_dict().items():
         assert torch.equal(value, original_state[name])
+
+def test_evaluate_loss_preserves_model_parameters_and_batch_limit():
+    torch.manual_seed(13)
+
+    model = YouTubeDNN(FEATURE_DICT, embedding_dim=4)
+    loader = DataLoader(
+        build_dataset(),
+        batch_size=2,
+        shuffle=False,
+    )
+
+    before = {
+        name: value.detach().clone()
+        for name, value in model.state_dict().items()
+    }
+
+    stats = evaluate_loss(
+        model,
+        loader,
+        torch.device("cpu"),
+        max_batches=1,
+    )
+
+    assert stats.batches == 1
+    assert stats.examples == 2
+    assert np.isfinite(stats.loss)
+    assert model.training is False
+
+    for name, value in model.state_dict().items():
+        assert torch.equal(value, before[name])
+
+    assert all(
+        parameter.grad is None
+        for parameter in model.parameters()
+    )
+
+
+def test_evaluate_loss_rejects_invalid_batch_limit():
+    model = YouTubeDNN(FEATURE_DICT, embedding_dim=4)
+    loader = DataLoader(build_dataset(), batch_size=2)
+
+    with pytest.raises(
+        ValueError,
+        match="greater than zero",
+    ):
+        evaluate_loss(
+            model,
+            loader,
+            torch.device("cpu"),
+            max_batches=0,
+        )
