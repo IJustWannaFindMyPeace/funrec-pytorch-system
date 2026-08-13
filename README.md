@@ -1,7 +1,7 @@
 # FunRec PyTorch Recommendation System
 
 > 本项目基于 [Datawhale FunRec](https://github.com/datawhalechina/fun-rec) 的生产级推荐系统实践项目进行学习与工程重构。
-> 本仓库仅保留原项目的 Web 推荐系统部分，并计划将原有 TensorFlow 实现的 YouTubeDNN 和 DeepFM 模型迁移至 PyTorch。
+> 本仓库仅保留原项目的 Web 推荐系统部分，并已将原有 TensorFlow 实现的 YouTubeDNN 和 DeepFM 模型迁移至 PyTorch。
 > 原项目版权及许可归原作者所有。
 
 ## 重构目标
@@ -61,7 +61,7 @@ docker compose up --build
 cd backend
 ```
 
-* 同步依赖（需要 Python 3.11，因为 TensorFlow 2.15 仅支持该版本）
+* 同步依赖（项目使用 Python 3.11）
 ```bash
 uv sync --python 3.11
 ```

@@ -95,8 +95,7 @@ def deploy_ranking_models(deploy_dir: Path):
             / "ranking_model_config.pkl"
         ),
         "ranking_model.pt": (
-            config.SAVED_MODELS_DIR
-            / "ranking_model.pt"
+            config.RANKING_MODEL_PATH
         ),
     }
 

@@ -134,6 +134,11 @@ def test_deploy_ranking_models_copies_pytorch_artifacts(
         "SAVED_MODELS_DIR",
         saved_models_dir,
     )
+    monkeypatch.setattr(
+        config,
+        "RANKING_MODEL_PATH",
+        ranking_model_path,
+    )
 
     legacy_dir = (
         deploy_dir
@@ -221,6 +226,11 @@ def test_deploy_ranking_models_rejects_missing_artifact(
         config,
         "SAVED_MODELS_DIR",
         saved_models_dir,
+    )
+    monkeypatch.setattr(
+        config,
+        "RANKING_MODEL_PATH",
+        saved_models_dir / "ranking_model.pt",
     )
 
     import pytest

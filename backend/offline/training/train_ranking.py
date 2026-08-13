@@ -31,9 +31,7 @@ LAST_CHECKPOINT_PATH = (
 BEST_CHECKPOINT_PATH = (
     config.SAVED_MODELS_DIR / "ranking_best.pt"
 )
-RANKING_MODEL_PATH = (
-    config.SAVED_MODELS_DIR / "ranking_model.pt"
-)
+RANKING_MODEL_PATH = config.RANKING_MODEL_PATH
 TRAINING_HISTORY_PATH = (
     config.SAVED_MODELS_DIR / "ranking_history.json"
 )
