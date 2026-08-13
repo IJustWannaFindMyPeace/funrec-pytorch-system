@@ -35,6 +35,12 @@ def load_raw_data():
     try:
         df_movies = pd.read_pickle(config.DATASET_DIR / "movies.pkl")
         df_ratings = pd.read_pickle(config.DATASET_DIR / "ratings.pkl")
+        df_ratings = df_ratings.copy()
+        df_ratings["timestamp"] = pd.to_numeric(
+            df_ratings["timestamp"],
+            errors="raise",
+        ).astype(np.int64)
+        df_ratings["_source_row"] = np.arange(len(df_ratings), dtype=np.int64)
         df_users = pd.read_pickle(config.DATASET_DIR / "users.pkl")
         return df_movies, df_ratings, df_users
     except FileNotFoundError:
@@ -56,7 +62,13 @@ def process_features_for_ranking(df_movies, df_ratings, df_users):
     # 选择列
     user_columns = ["user_id", "gender", "age", "occupation", "zip_code"]
     movie_columns = ["movie_id", "genres", "isAdult", "startYear"]
-    ratings_columns = ["user_id", "movie_id", "rating", "timestamp"]
+    ratings_columns = [
+        "user_id",
+        "movie_id",
+        "rating",
+        "timestamp",
+        "_source_row",
+    ]
     
     df_users = df_users[user_columns].copy()
     df_movies = df_movies[["movie_id", "genres", "isAdult", "startYear"]].copy()
@@ -90,25 +102,6 @@ def process_features_for_ranking(df_movies, df_ratings, df_users):
         df_movies[feat_name] = df_movies[feat_name].fillna("unknown" if df_movies[feat_name].dtype == object else 0)
         df_movies[feat_name + "_encoded"] = label_encoder.fit_transform(df_movies[feat_name].astype(str)) + 1
         movie_vocab[feat_name] = label_encoder.classes_
-    
-    # 计算用户平均评分，用于生成标签
-    print("计算用户平均评分...")
-    user_avg_ratings = df_ratings.groupby("user_id")["rating"].mean().reset_index()
-    user_avg_ratings.columns = ["user_id", "user_avg_rating"]
-    df_ratings = df_ratings.merge(user_avg_ratings, on="user_id", how="left")
-    
-    # 基于已有逻辑生成标签：
-    # - conversion（转化）: rating >= user_avg_rating（强正向信号）
-    # - click（点击）: rating >= user_avg_rating - 1（弱正向信号）
-    # - exposure（曝光）: 所有交互
-    df_ratings['conversion'] = (df_ratings['rating'] >= df_ratings['user_avg_rating']).astype(int)
-    df_ratings['click'] = (df_ratings['rating'] >= df_ratings['user_avg_rating'] - 1).astype(int)
-    df_ratings['exposure'] = 1  # 所有评分都是曝光
-    
-    # 对于精排，使用 click 作为主要标签
-    # 正样本: click=1
-    # 困难负样本（来自曝光）: click=0
-    df_ratings['is_click'] = df_ratings['click']
     
     # 合并所有特征
     print("合并特征...")
@@ -146,12 +139,76 @@ def process_features_for_ranking(df_movies, df_ratings, df_users):
     
     return df_merged, user_vocab, movie_vocab
 
+def split_interactions_by_time(df_interactions, test_ratio=0.2):
+    """在每个用户内部按时间划分原始交互。"""
+    if not 0 < test_ratio < 1:
+        raise ValueError("test_ratio 必须在 0 和 1 之间")
+
+    ordered = df_interactions.sort_values(
+        ["user_id_original", "timestamp", "_source_row"],
+        kind="stable",
+    ).copy()
+
+    group_sizes = ordered.groupby("user_id_original")["user_id_original"].transform(
+        "size"
+    )
+    positions = ordered.groupby("user_id_original").cumcount()
+
+    train_sizes = np.floor(group_sizes * (1 - test_ratio)).astype(int)
+    train_sizes = train_sizes.clip(lower=1)
+    train_sizes = np.minimum(train_sizes, group_sizes - 1)
+
+    train_mask = positions < train_sizes
+    train_interactions = ordered.loc[train_mask].copy()
+    test_interactions = ordered.loc[~train_mask].copy()
+
+    return train_interactions, test_interactions
+
+def assign_labels_from_training_history(train_interactions, test_interactions):
+    """仅使用训练期评分均值，为训练和测试交互生成标签。"""
+    train_interactions = train_interactions.copy()
+    test_interactions = test_interactions.copy()
+
+    train_user_averages = train_interactions.groupby("user_id_original")[
+        "rating"
+    ].mean()
+
+    for name, interactions in (
+        ("train", train_interactions),
+        ("test", test_interactions),
+    ):
+        interactions["user_avg_rating"] = interactions["user_id_original"].map(
+            train_user_averages
+        )
+
+        if interactions["user_avg_rating"].isna().any():
+            missing_users = interactions.loc[
+                interactions["user_avg_rating"].isna(),
+                "user_id_original",
+            ].nunique()
+            raise ValueError(
+                f"{name} 数据中有 {missing_users} 个用户缺少训练期评分均值"
+            )
+
+        interactions["conversion"] = (
+            interactions["rating"] >= interactions["user_avg_rating"]
+        ).astype(int)
+        interactions["click"] = (
+            interactions["rating"] >= interactions["user_avg_rating"] - 1
+        ).astype(int)
+        interactions["exposure"] = 1
+        interactions["is_click"] = interactions["click"]
+
+    return train_interactions, test_interactions
 
 def generate_negative_samples(
-    df_merged, 
+    df_merged,
     movie_vocab,
-    neg_ratio_from_exposure=1,  # 每个正样本的困难负样本比例
-    neg_ratio_random=2,         # 每个正样本的随机负样本比例
+    all_interactions=None,
+    excluded_pairs=None,
+    neg_ratio_from_exposure=1,
+    neg_ratio_random=2,
+    random_seed=42,
 ):
     """
     为精排生成负样本
@@ -172,16 +229,27 @@ def generate_negative_samples(
         添加了负样本的 DataFrame
     """
     print("生成负样本...")
-    
-    # 用于随机采样的所有编码后电影 ID
-    all_movie_ids = set(range(1, len(movie_vocab["movie_id"]) + 1))
+
+    if all_interactions is None:
+        all_interactions = df_merged
+
+    rng = random.Random(random_seed)
+    excluded_by_user = defaultdict(set)
+    if excluded_pairs:
+        for user_id, movie_id in excluded_pairs:
+            excluded_by_user[user_id].add(movie_id)
     
     # 获取用于负采样的电影特征
-    movie_features = df_merged[["movie_id", "genres", "isAdult", "startYear", "movie_id_original"]].drop_duplicates()
+    movie_features = all_interactions[
+        ["movie_id", "genres", "isAdult", "startYear", "movie_id_original"]
+    ].drop_duplicates(subset="movie_id")
     movie_features_dict = movie_features.set_index("movie_id").to_dict("index")
+    all_movie_ids = set(movie_features_dict)
     
     # 分离正样本和困难负样本（曝光但未点击）
     positive_samples = df_merged[df_merged["is_click"] == 1].copy()
+    positive_samples["_sample_type"] = "positive"
+
     hard_negative_pool = df_merged[df_merged["is_click"] == 0].copy()
     
     print(f"  正样本: {len(positive_samples)}")
@@ -194,7 +262,11 @@ def generate_negative_samples(
         user_hard_negatives[user_id] = group
     
     # 构建每个用户的交互历史（用于排除随机负样本）
-    user_interactions = df_merged.groupby("user_id_original")["movie_id"].apply(set).to_dict()
+    user_interactions = (
+        all_interactions.groupby("user_id_original")["movie_id"]
+        .apply(set)
+        .to_dict()
+    )
     
     # 统计同时有正样本和困难负样本的用户数
     users_with_hard_neg = set(user_hard_negatives.keys())
@@ -227,8 +299,9 @@ def generate_negative_samples(
             n_to_sample = min(len(user_hard_neg_pool), n_hard_neg_needed)
             if n_to_sample > 0:
                 sampled = user_hard_neg_pool.sample(
-                    n=n_to_sample, 
-                    replace=len(user_hard_neg_pool) < n_to_sample
+                    n=n_to_sample,
+                    replace=False,
+                    random_state=rng.randrange(2**32),
                 )
                 hard_neg_list.append(sampled)
                 hard_neg_count += len(sampled)
@@ -236,6 +309,7 @@ def generate_negative_samples(
         if hard_neg_list:
             hard_neg_df = pd.concat(hard_neg_list, ignore_index=True)
             hard_neg_df["is_click"] = 0
+            hard_neg_df["_sample_type"] = "hard_negative"
             negative_samples.append(hard_neg_df)
             print(f"    添加了 {hard_neg_count} 个困难负样本")
     
@@ -243,40 +317,60 @@ def generate_negative_samples(
     if neg_ratio_random > 0:
         print(f"  为每个正样本采样 {neg_ratio_random} 个随机负样本...")
         random_neg_list = []
-        
-        for _, row in tqdm(positive_samples.iterrows(), total=len(positive_samples), 
-                          desc="随机负样本"):
-            user_id_orig = row["user_id_original"]
+        random_shortfall = 0
+
+        grouped_positives = positive_samples.groupby("user_id_original")
+        for user_id_orig, user_positives in tqdm(
+            grouped_positives,
+            total=grouped_positives.ngroups,
+            desc="随机负样本 (每个用户)",
+        ):
             user_interacted = user_interactions.get(user_id_orig, set())
-            
-            # 获取用户未交互过的电影 ID
-            available_movies = list(all_movie_ids - user_interacted)
-            
-            if len(available_movies) < neg_ratio_random:
+            user_excluded = excluded_by_user.get(user_id_orig, set())
+
+            available_movies = sorted(
+                all_movie_ids - user_interacted - user_excluded
+            )
+
+            n_needed = len(user_positives) * neg_ratio_random
+            n_to_sample = min(n_needed, len(available_movies))
+            random_shortfall += n_needed - n_to_sample
+
+            if n_to_sample == 0:
                 continue
-                
-            # 采样随机负样本
-            neg_movie_ids = random.sample(available_movies, neg_ratio_random)
-            
-            for neg_movie_id in neg_movie_ids:
-                if neg_movie_id in movie_features_dict:
-                    movie_feats = movie_features_dict[neg_movie_id]
-                    random_neg_list.append({
-                        "user_id": row["user_id"],
-                        "user_id_original": user_id_orig,
-                        "gender": row["gender"],
-                        "age": row["age"],
-                        "occupation": row["occupation"],
-                        "zip_code": row["zip_code"],
-                        "movie_id": neg_movie_id,
-                        "movie_id_original": movie_feats.get("movie_id_original", neg_movie_id),
-                        "genres": movie_feats.get("genres", 0),
-                        "isAdult": movie_feats.get("isAdult", 0),
-                        "startYear": movie_feats.get("startYear", 0),
-                        "is_click": 0,
-                        "rating": 0,
-                        "timestamp": row["timestamp"],
-                    })
+
+            neg_movie_ids = rng.sample(available_movies, n_to_sample)
+            anchors = user_positives.reset_index(drop=True)
+
+            for offset, neg_movie_id in enumerate(neg_movie_ids):
+                movie_feats = movie_features_dict[neg_movie_id]
+                row = anchors.iloc[offset % len(anchors)]
+
+                random_neg_list.append({
+                    "user_id": row["user_id"],
+                    "user_id_original": user_id_orig,
+                    "gender": row["gender"],
+                    "age": row["age"],
+                    "occupation": row["occupation"],
+                    "zip_code": row["zip_code"],
+                    "movie_id": neg_movie_id,
+                    "movie_id_original": movie_feats.get(
+                        "movie_id_original",
+                        neg_movie_id,
+                    ),
+                    "genres": movie_feats.get("genres", 0),
+                    "isAdult": movie_feats.get("isAdult", 0),
+                    "startYear": movie_feats.get("startYear", 0),
+                    "is_click": 0,
+                    "rating": 0,
+                    "timestamp": row["timestamp"],
+                    "_sample_type": "random_negative",
+                })
+
+        if random_shortfall:
+            print(
+                f"    因候选不足少生成了 {random_shortfall} 个随机负样本"
+            )
         
         if random_neg_list:
             random_neg_df = pd.DataFrame(random_neg_list)
@@ -284,9 +378,21 @@ def generate_negative_samples(
             print(f"    添加了 {len(random_neg_df)} 随机负样本")
     
     # 合并正样本和负样本
-    output_cols = ["user_id", "gender", "age", "occupation", "zip_code",
-                   "movie_id", "genres", "isAdult", "startYear", 
-                   "is_click", "timestamp", "user_id_original"]
+    output_cols = [
+        "user_id",
+        "gender",
+        "age",
+        "occupation",
+        "zip_code",
+        "movie_id",
+        "genres",
+        "isAdult",
+        "startYear",
+        "is_click",
+        "timestamp",
+        "user_id_original",
+        "_sample_type",
+    ]
     all_samples = [positive_samples[output_cols]]
     
     for neg_df in negative_samples:
@@ -310,38 +416,6 @@ def generate_negative_samples(
     
     return df_final
 
-
-def split_train_test(df_final, test_ratio=0.2, by_time=True):
-    """
-    将数据划分为训练集和测试集
-    
-    Args:
-        df_final: 包含所有样本的 DataFrame
-        test_ratio: 测试集比例
-        by_time: 如果为 True，使用时间划分；否则随机划分
-    
-    Returns:
-        train_df, test_df
-    """
-    print("划分训练集和测试集...")
-    
-    if by_time and "timestamp" in df_final.columns:
-        # 时间划分：使用较新的数据作为测试集
-        df_final = df_final.sort_values("timestamp")
-        split_idx = int(len(df_final) * (1 - test_ratio))
-        train_df = df_final.iloc[:split_idx]
-        test_df = df_final.iloc[split_idx:]
-    else:
-        # 随机划分
-        from sklearn.model_selection import train_test_split
-        train_df, test_df = train_test_split(df_final, test_size=test_ratio, random_state=42)
-    
-    print(f"  训练集: {len(train_df)} 样本 (正样本: {(train_df['is_click']==1).sum()})")
-    print(f"  测试集: {len(test_df)} 样本 (正样本: {(test_df['is_click']==1).sum()})")
-    
-    return train_df, test_df
-
-
 def convert_to_dict(df, feature_columns, label_column="is_click"):
     """将 DataFrame 转换为用于模型训练的字典格式"""
     result = {}
@@ -354,7 +428,6 @@ def convert_to_dict(df, feature_columns, label_column="is_click"):
         result["user_id_original"] = df["user_id_original"].values
     
     return result
-
 
 def run_ranking_preprocessing(
     neg_ratio_from_exposure=1,
@@ -380,19 +453,55 @@ def run_ranking_preprocessing(
     df_merged, user_vocab, movie_vocab = process_features_for_ranking(
         df_movies, df_ratings, df_users
     )
-    
-    # 3. 生成负样本
-    df_final = generate_negative_samples(
+
+    # 3. 在每个用户内部按时间划分原始交互
+    train_interactions, test_interactions = split_interactions_by_time(
         df_merged,
+        test_ratio=test_ratio,
+    )
+
+    # 4. 仅使用训练期历史计算标签
+    train_interactions, test_interactions = (
+        assign_labels_from_training_history(
+            train_interactions,
+            test_interactions,
+        )
+    )
+
+    # 5. 分别生成训练集和测试集负样本
+    train_df = generate_negative_samples(
+        train_interactions,
         movie_vocab,
+        all_interactions=df_merged,
         neg_ratio_from_exposure=neg_ratio_from_exposure,
         neg_ratio_random=neg_ratio_random,
+        random_seed=42,
+    )
+
+    train_random_pairs = set(
+        zip(
+            train_df.loc[
+                train_df["_sample_type"] == "random_negative",
+                "user_id_original",
+            ],
+            train_df.loc[
+                train_df["_sample_type"] == "random_negative",
+                "movie_id",
+            ],
+        )
+    )
+
+    test_df = generate_negative_samples(
+        test_interactions,
+        movie_vocab,
+        all_interactions=df_merged,
+        excluded_pairs=train_random_pairs,
+        neg_ratio_from_exposure=neg_ratio_from_exposure,
+        neg_ratio_random=neg_ratio_random,
+        random_seed=43,
     )
     
-    # 4. 划分训练集和测试集
-    train_df, test_df = split_train_test(df_final, test_ratio=test_ratio, by_time=True)
-    
-    # 5. 转换为字典格式
+    # 6. 转换为字典格式
     feature_columns = ["user_id", "gender", "age", "occupation", "zip_code",
                        "movie_id", "genres", "isAdult", "startYear"]
     
@@ -401,11 +510,11 @@ def run_ranking_preprocessing(
     
     samples = {"train": train_data, "test": test_data}
     
-    # 6. 构建特征词典 (嵌入词汇表大小)
+    # 7. 构建特征词典 (嵌入词汇表大小)
     vocab_dict = {**user_vocab, **movie_vocab}
     feature_dict = {k: len(v) + 1 for k, v in vocab_dict.items()}  # +1 for padding/unknown
     
-    # 7. 保存输出
+    # 8. 保存输出
     print("保存处理后的数据...")
     ranking_data_path = config.TEMP_DIR / "ranking_train_eval_sample.pkl"
     ranking_feature_dict_path = config.TEMP_DIR / "ranking_feature_dict.pkl"

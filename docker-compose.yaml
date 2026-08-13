@@ -71,11 +71,10 @@ services:
       - DATA_DIR=/data
       - POSTER_DIR=/data/image
       - DEBUG=true
-      - TF_USE_LEGACY_KERAS=1
       - PYTHONPATH=/app/src:/app
     volumes:
       - ./backend:/app
-      - ../tmp:/app/tmp      
+      - ${FUNREC_PROCESSED_DATA_PATH}:/app/tmp
       - ${FUNREC_RAW_DATA_PATH}:/data
     depends_on:
       postgres:

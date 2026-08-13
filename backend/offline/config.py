@@ -47,6 +47,8 @@ class Config:
     RANKING_TRAIN_DATA_PATH = TEMP_DIR / "ranking_train_eval_sample.pkl"
     RANKING_FEATURE_DICT_PATH = TEMP_DIR / "ranking_feature_dict.pkl"
     RANKING_VOCAB_DICT_PATH = TEMP_DIR / "ranking_vocab_dict.pkl"
-    RANKING_MODEL_PATH = SAVED_MODELS_DIR / "ranking_model"
+    RANKING_MODEL_PATH = (
+        SAVED_MODELS_DIR / "ranking_model.pt"
+    )
 
 config = Config()
