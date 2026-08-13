@@ -5,6 +5,11 @@ FunRec 离线流水线
 """
 
 import argparse
+
+# On Windows, load PyTorch before NumPy/Pandas-dependent modules to avoid
+# intermittent c10.dll initialization failures.
+import torch  # noqa: F401
+
 from offline.feature.preprocess_retrieval import run_retrieval_preprocessing
 from offline.feature.preprocess_ranking import run_ranking_preprocessing
 from offline.training.train_retrieval import run_retrieval_training
@@ -14,7 +19,7 @@ from offline.storage.local_deploy import deploy_local
 
 def main():
     parser = argparse.ArgumentParser(description="FunRec 离线流水线")
-    parser.add_argument("--steps", type=str, default="all", help="要执行的步骤: all, preprocess, train, ingest, deploy")
+    parser.add_argument("--steps", type=str, default="all", help="要执行的步骤: all, retrieval_preprocess, ranking_preprocess, retrieval_training, ranking_training, ingest, deploy")
     parser.add_argument("--flush-redis", action="store_true", help="清空 Redis 数据库")
     args = parser.parse_args()
     
