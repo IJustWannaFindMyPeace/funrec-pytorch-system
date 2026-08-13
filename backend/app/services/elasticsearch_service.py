@@ -63,21 +63,23 @@ class ElasticsearchService:
     }
     
     def __init__(self):
-        """初始化 Elasticsearch 客户端"""
+        """创建客户端，但不在模块导入阶段发起网络连接。"""
         try:
             self.client = Elasticsearch(
                 [settings.elasticsearch_url],
                 verify_certs=False,
                 max_retries=3,
-                retry_on_timeout=True
+                retry_on_timeout=True,
             )
-            # 测试连接
-            if self.client.ping():
-                logger.info(f"✓ 已连接到 Elasticsearch: {settings.elasticsearch_url}")
-            else:
-                logger.warning(f"⚠ 无法连接到 Elasticsearch: {settings.elasticsearch_url}")
-        except Exception as e:
-            logger.error(f"✗ Elasticsearch 连接错误: {e}")
+            logger.debug(
+                "Elasticsearch 客户端已初始化: %s",
+                settings.elasticsearch_url,
+            )
+        except Exception as error:
+            logger.error(
+                "Elasticsearch 客户端初始化失败: %s",
+                error,
+            )
             self.client = None
     
     def is_available(self) -> bool:

@@ -14,6 +14,8 @@ from app.api.deps import get_db
 from app.models import Movie, User, Rating
 from online.pipeline import get_pipeline, PipelineConfig, RecommendationResult
 
+from app.config import settings
+
 router = APIRouter()
 
 
@@ -129,7 +131,10 @@ def enrich_with_metadata(
                 score=item.score,
                 recall_score=item.recall_score,
                 recall_type=item.recall_type,
-                poster_url=f"/api/v1/posters/{movie.movie_id}.png"
+                poster_url=(
+                    f"{settings.api_prefix}/posters/"
+                    f"{movie.movie_id}.png"
+                )
             ))
     return enriched
 
