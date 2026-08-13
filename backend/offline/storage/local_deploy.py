@@ -11,7 +11,6 @@
     uv run python -m offline.storage.local_deploy --recall-only
 """
 
-import json
 import shutil
 import argparse
 from pathlib import Path
@@ -73,59 +72,67 @@ def deploy_recall_models(deploy_dir: Path):
 
 
 def deploy_ranking_models(deploy_dir: Path):
-    """部署精排相关的模型和工件 (DeepFM)"""
+    """部署 PyTorch DeepFM 精排模型及编码工件。"""
     print("\n" + "=" * 50)
     print("部署精排模型...")
     print("=" * 50)
-    
+
     ranking_dir = deploy_dir / "ranking"
-    ranking_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 1. 精排词表字典
-    if config.RANKING_VOCAB_DICT_PATH.exists():
-        shutil.copy2(config.RANKING_VOCAB_DICT_PATH, ranking_dir / "vocab_dict.pkl")
-        print("  ✓ 复制了 ranking/vocab_dict.pkl")
-    else:
-        print("  ✗ ranking vocab_dict.pkl 不存在")
-    
-    # 2. 精排特征字典（词表大小）
-    if config.RANKING_FEATURE_DICT_PATH.exists():
-        shutil.copy2(config.RANKING_FEATURE_DICT_PATH, ranking_dir / "feature_dict.pkl")
-        print("  ✓ 复制了 ranking/feature_dict.pkl")
-    else:
-        print("  ✗ ranking feature_dict.pkl 不存在")
-    
-    # 3. 精排模型配置（如果存在）
-    ranking_config_path = config.TEMP_DIR / "ranking_model_config.pkl"
-    if ranking_config_path.exists():
-        shutil.copy2(ranking_config_path, ranking_dir / "model_config.pkl")
-        print("  ✓ 复制了 ranking/model_config.pkl")
-        
-    # 4. DeepFM 精排模型
-    ranking_model_path = config.RANKING_MODEL_PATH
-    if ranking_model_path.exists():
-        model_deploy_dir = deploy_dir / "model" / "ranking" / "v1"
-        model_deploy_dir.mkdir(parents=True, exist_ok=True)
-        
-        # 复制整个模型目录
-        dest_model_path = model_deploy_dir / "ranking_model"
-        if dest_model_path.exists():
-            shutil.rmtree(dest_model_path)
-        shutil.copytree(ranking_model_path, dest_model_path)
-        
-        # 更新活跃版本指针
-        version_info = {
-            "version": "v1", 
-            "path": "model/ranking/v1/ranking_model",
-            "model_type": "deepfm"
-        }
-        active_json_path = deploy_dir / "model" / "ranking" / "active.json"
-        active_json_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(active_json_path, "w") as f:
-            json.dump(version_info, f)
-        print("  ✓ 复制了 Ranking Model (DeepFM)")
-    else:
-        print(f"  ✗ Ranking model 不存在 at {ranking_model_path}")
+    ranking_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    source_paths = {
+        "vocab_dict.pkl": (
+            config.RANKING_VOCAB_DICT_PATH
+        ),
+        "feature_dict.pkl": (
+            config.RANKING_FEATURE_DICT_PATH
+        ),
+        "model_config.pkl": (
+            config.TEMP_DIR
+            / "ranking_model_config.pkl"
+        ),
+        "ranking_model.pt": (
+            config.SAVED_MODELS_DIR
+            / "ranking_model.pt"
+        ),
+    }
+
+    missing_paths = [
+        path
+        for path in source_paths.values()
+        if not path.exists()
+    ]
+    if missing_paths:
+        missing = "\n".join(
+            f"  - {path}"
+            for path in missing_paths
+        )
+        raise FileNotFoundError(
+            "精排部署工件缺失:\n"
+            f"{missing}"
+        )
+
+    for deployed_name, source_path in (
+        source_paths.items()
+    ):
+        shutil.copy2(
+            source_path,
+            ranking_dir / deployed_name,
+        )
+        print(
+            f"  ✓ 复制了 ranking/{deployed_name}"
+        )
+
+    # 清理旧 TensorFlow SavedModel 部署目录，避免在线
+    # 服务误加载过期模型。
+    legacy_model_dir = (
+        deploy_dir / "model" / "ranking"
+    )
+    if legacy_model_dir.exists():
+        shutil.rmtree(legacy_model_dir)
 
 
 def deploy_local(recall: bool = True, ranking: bool = True):

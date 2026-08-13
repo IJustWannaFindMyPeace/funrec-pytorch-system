@@ -1,6 +1,8 @@
 from offline.config import config
-from offline.storage.local_deploy import deploy_recall_models
-
+from offline.storage.local_deploy import (
+    deploy_ranking_models,
+    deploy_recall_models,
+)
 
 def test_deploy_recall_models_copies_pytorch_artifacts(
     monkeypatch,
@@ -80,3 +82,151 @@ def test_deploy_recall_models_copies_pytorch_artifacts(
         / "user_recall"
         / "active.json"
     ).exists()
+
+def test_deploy_ranking_models_copies_pytorch_artifacts(
+    monkeypatch,
+    tmp_path,
+):
+    source_dir = tmp_path / "source"
+    saved_models_dir = source_dir / "saved_models"
+    deploy_dir = tmp_path / "deployed_models"
+
+    saved_models_dir.mkdir(parents=True)
+
+    vocab_path = source_dir / "ranking_vocab_dict.pkl"
+    feature_dict_path = (
+        source_dir / "ranking_feature_dict.pkl"
+    )
+    model_config_path = (
+        source_dir / "ranking_model_config.pkl"
+    )
+    ranking_model_path = (
+        saved_models_dir / "ranking_model.pt"
+    )
+
+    source_files = {
+        vocab_path: b"ranking vocabulary",
+        feature_dict_path: b"ranking feature dictionary",
+        model_config_path: b"ranking model config",
+        ranking_model_path: b"pytorch ranking model",
+    }
+
+    for path, content in source_files.items():
+        path.write_bytes(content)
+
+    monkeypatch.setattr(
+        config,
+        "RANKING_VOCAB_DICT_PATH",
+        vocab_path,
+    )
+    monkeypatch.setattr(
+        config,
+        "RANKING_FEATURE_DICT_PATH",
+        feature_dict_path,
+    )
+    monkeypatch.setattr(
+        config,
+        "TEMP_DIR",
+        source_dir,
+    )
+    monkeypatch.setattr(
+        config,
+        "SAVED_MODELS_DIR",
+        saved_models_dir,
+    )
+
+    legacy_dir = (
+        deploy_dir
+        / "model"
+        / "ranking"
+        / "v1"
+        / "ranking_model"
+    )
+    legacy_dir.mkdir(parents=True)
+    (legacy_dir / "saved_model.pb").write_bytes(
+        b"legacy tensorflow model"
+    )
+
+    deploy_ranking_models(deploy_dir)
+
+    expected_files = {
+        "vocab_dict.pkl": b"ranking vocabulary",
+        "feature_dict.pkl": (
+            b"ranking feature dictionary"
+        ),
+        "model_config.pkl": (
+            b"ranking model config"
+        ),
+        "ranking_model.pt": (
+            b"pytorch ranking model"
+        ),
+    }
+
+    for name, expected_content in (
+        expected_files.items()
+    ):
+        deployed_path = (
+            deploy_dir / "ranking" / name
+        )
+
+        assert deployed_path.exists()
+        assert (
+            deployed_path.read_bytes()
+            == expected_content
+        )
+
+    assert not (
+        deploy_dir / "model" / "ranking"
+    ).exists()
+
+
+def test_deploy_ranking_models_rejects_missing_artifact(
+    monkeypatch,
+    tmp_path,
+):
+    source_dir = tmp_path / "source"
+    saved_models_dir = source_dir / "saved_models"
+    deploy_dir = tmp_path / "deployed_models"
+
+    saved_models_dir.mkdir(parents=True)
+
+    vocab_path = source_dir / "ranking_vocab_dict.pkl"
+    feature_dict_path = (
+        source_dir / "ranking_feature_dict.pkl"
+    )
+    model_config_path = (
+        source_dir / "ranking_model_config.pkl"
+    )
+
+    vocab_path.write_bytes(b"vocabulary")
+    feature_dict_path.write_bytes(b"feature dictionary")
+    model_config_path.write_bytes(b"model config")
+
+    monkeypatch.setattr(
+        config,
+        "RANKING_VOCAB_DICT_PATH",
+        vocab_path,
+    )
+    monkeypatch.setattr(
+        config,
+        "RANKING_FEATURE_DICT_PATH",
+        feature_dict_path,
+    )
+    monkeypatch.setattr(
+        config,
+        "TEMP_DIR",
+        source_dir,
+    )
+    monkeypatch.setattr(
+        config,
+        "SAVED_MODELS_DIR",
+        saved_models_dir,
+    )
+
+    import pytest
+
+    with pytest.raises(
+        FileNotFoundError,
+        match="精排部署工件缺失",
+    ):
+        deploy_ranking_models(deploy_dir)
