@@ -1,0 +1,32 @@
+[
+  {
+    "artifact": "saved_models/retrieval_user_model.pt",
+    "algorithm": "SHA256",
+    "hash": "2483205AD6CE994D5326FD3C6C1848442F8334C935694647F8C7B1E7602C6600"
+  },
+  {
+    "artifact": "item_embeddings.npy",
+    "algorithm": "SHA256",
+    "hash": "F281D5F16200DF43D56CE56800B7B59B6A1FE860AD934D1834C2DC742C403F86"
+  },
+  {
+    "artifact": "movie_ids.npy",
+    "algorithm": "SHA256",
+    "hash": "80E1CB0ADBA099946359462305E6DF8C83E957800D212F38A4431D823F759339"
+  },
+  {
+    "artifact": "saved_models/ranking_best.pt",
+    "algorithm": "SHA256",
+    "hash": "7905371C375F58CA583E272FE9237C11E787E8A0ED6F7DDDC0BB6E75450BA950"
+  },
+  {
+    "artifact": "saved_models/ranking_model.pt",
+    "algorithm": "SHA256",
+    "hash": "79D6227E1E6F76AB5FD69CC8EE44D72442418B699C1BF559E311E6907791D209"
+  },
+  {
+    "artifact": "ranking_model_config.pkl",
+    "algorithm": "SHA256",
+    "hash": "8AEB9F7D31B2221599C42F6FDCD2B4B3020D294B3D99FCAD4286FE313961297C"
+  }
+]

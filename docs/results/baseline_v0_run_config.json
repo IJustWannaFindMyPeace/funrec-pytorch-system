@@ -1,0 +1,82 @@
+{
+  "experiment": "baseline-v0",
+  "status": "test_evaluated_sealed",
+  "git_commit": "d65c9d62291964e39767f537e8cc07a7abceabc4",
+  "created_at": "2026-08-14T17:39:41.9484460+08:00",
+  "processed_data_root": "<FUNREC_PROCESSED_DATA_PATH>",
+  "protocol": {
+    "split": "per-user chronological train/validation/test",
+    "validation_usage": "checkpoint selection and early stopping",
+    "test_usage": "single final evaluation after configuration freeze",
+    "catalog": "closed-catalog transductive",
+    "seed": 42
+  },
+  "environment": {
+    "python": "Python 3.11.15",
+    "pytorch": "2.12.1+cu132",
+    "cuda_available": "True",
+    "gpu": "NVIDIA GeForce RTX 5070"
+  },
+  "retrieval": {
+    "model": "YouTubeDNN",
+    "epochs": 30,
+    "batch_size": 128,
+    "learning_rate": 0.001,
+    "embedding_dim": 16,
+    "patience": 3,
+    "num_workers": 0,
+    "device": "cuda",
+    "max_train_batches": null,
+    "max_eval_batches": null,
+    "initial_epoch_budget": 3,
+    "budget_revision_reason": "Validation loss improved in every epoch through epoch 3; extended to at most 10 epochs with patience 2 before any test evaluation.",
+    "selection_metric": "validation_loss",
+    "final_budget_policy": "Resume from epoch 10; train up to epoch 30 and select the minimum validation-loss checkpoint with patience 3. Test remains unopened.",
+    "actual_epochs_run": 17,
+    "best_epoch": 14,
+    "best_validation_loss": 6.28292777206724,
+    "stop_reason": "Early stopping after epochs 15-17 failed to improve on epoch 14."
+  },
+  "ranking": {
+    "model": "DeepFM",
+    "epochs": 30,
+    "batch_size": 128,
+    "learning_rate": 0.001,
+    "embedding_dim": 16,
+    "dnn_hidden_units": [
+      128,
+      64,
+      32
+    ],
+    "dropout": 0.1,
+    "patience": 3,
+    "num_workers": 0,
+    "device": "cuda",
+    "max_train_batches": null,
+    "max_eval_batches": null,
+    "initial_epoch_budget": 3,
+    "selection_metric": "validation_auc",
+    "budget_policy": "Train from scratch for at most 30 epochs; select maximum validation AUC with patience 3. Test remains unopened.",
+    "actual_epochs_run": 8,
+    "best_epoch": 5,
+    "best_validation_auc": 0.8662374174560615,
+    "validation_loss_at_best_auc": 0.41761075168054,
+    "minimum_validation_loss_epoch": 2,
+    "minimum_validation_loss": 0.41315350415143937,
+    "stop_reason": "Early stopping after epochs 6-8 failed to improve on epoch 5 validation AUC."
+  },
+  "configuration_frozen_at": "2026-08-14T19:43:11.4858404+08:00",
+  "final_test": {
+    "evaluated_once": true,
+    "rerun_allowed": false,
+    "exit_code": 0,
+    "metrics_file": "evaluation/baseline_v0_test_metrics.json",
+    "frozen_raw_file": "evaluation/baseline_v0_test_metrics_raw_frozen.json",
+    "sha256": "2B88A39F61C18CC46562295E114273F0D015F14EB2FA8842124C3F5DF8918B9E",
+    "retrieval_best_epoch": 14,
+    "ranking_best_epoch": 5,
+    "retrieval_recall_at_10": 0.13708609275470507,
+    "retrieval_ndcg_at_10": 0.07029810383027753,
+    "ranking_roc_auc": 0.8413824316297281
+  }
+}

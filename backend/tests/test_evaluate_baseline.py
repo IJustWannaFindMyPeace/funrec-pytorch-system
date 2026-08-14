@@ -28,9 +28,22 @@ def test_run_baseline_protects_existing_final_result(tmp_path):
 
 def test_build_manifest_records_experiment(monkeypatch):
     monkeypatch.setattr(evaluation, "git_commit", lambda: "abc123")
-    manifest = evaluation.build_manifest(seed=42)
+    manifest = evaluation.build_manifest(
+        seed=42,
+        retrieval={"model": {"best_checkpoint_epoch": 14}},
+        ranking={"model": {"best_checkpoint_epoch": 5}},
+    )
 
     assert manifest["experiment"] == "baseline-v0"
     assert manifest["git_commit"] == "abc123"
     assert manifest["seed"] == 42
     assert manifest["configuration"]["embedding_dimension"] > 0
+    assert manifest["configuration"]["configured_default_epochs"] > 0
+    assert "epochs" not in manifest["configuration"]
+    assert manifest["training_selection"] == {
+        "retrieval_best_checkpoint_epoch": 14,
+        "ranking_best_checkpoint_epoch": 5,
+    }
+    assert manifest["artifact_root"] == (
+        "<FUNREC_PROCESSED_DATA_PATH>/web_project"
+    )

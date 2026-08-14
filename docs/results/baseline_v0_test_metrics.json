@@ -1,0 +1,225 @@
+{
+  "manifest": {
+    "experiment": "baseline-v0",
+    "created_at_utc": "2026-08-14T11:51:17.866303+00:00",
+    "git_commit": "d65c9d62291964e39767f537e8cc07a7abceabc4",
+    "seed": 42,
+    "environment": {
+      "python": "3.11.15",
+      "pytorch": "2.12.1+cu132",
+      "cuda_available": true,
+      "cuda_version": "13.2",
+      "device_name": "NVIDIA GeForce RTX 5070"
+    },
+    "configuration": {
+      "max_sequence_length": 10,
+      "embedding_dimension": 16,
+      "negative_sample_size": 20,
+      "batch_size": 128,
+      "learning_rate": 0.001,
+      "configured_default_epochs": 3
+    },
+    "artifact_root": "<FUNREC_PROCESSED_DATA_PATH>/web_project",
+    "training_selection": {
+      "retrieval_best_checkpoint_epoch": 14,
+      "ranking_best_checkpoint_epoch": 5
+    },
+    "source_test_sha256": "2B88A39F61C18CC46562295E114273F0D015F14EB2FA8842124C3F5DF8918B9E",
+    "test_evaluated_once": true,
+    "training_run": {
+      "retrieval": {
+        "epochs_run": 17,
+        "best_epoch": 14,
+        "selection_metric": "validation_loss"
+      },
+      "ranking": {
+        "epochs_run": 8,
+        "best_epoch": 5,
+        "selection_metric": "validation_auc"
+      }
+    }
+  },
+  "retrieval": {
+    "protocol": {
+      "test_users": 6040,
+      "relevant_items_per_user": 1,
+      "history_filtered": true,
+      "item_count": 3883,
+      "embedding_dimension": 16,
+      "k_values": [
+        5,
+        10,
+        20,
+        50
+      ]
+    },
+    "model": {
+      "name": "youtube_dnn",
+      "best_checkpoint_epoch": 14,
+      "metrics": {
+        "recall@5": 0.08543046359589558,
+        "hit_rate@5": 0.08543046359589558,
+        "ndcg@5": 0.053783838845641405,
+        "recall@10": 0.13708609275470507,
+        "hit_rate@10": 0.13708609275470507,
+        "ndcg@10": 0.07029810383027753,
+        "recall@20": 0.2163907284768212,
+        "hit_rate@20": 0.2163907284768212,
+        "ndcg@20": 0.09025917342364394,
+        "recall@50": 0.36473509933774834,
+        "hit_rate@50": 0.36473509933774834,
+        "ndcg@50": 0.11960947030032708
+      },
+      "elapsed_seconds": 0.6333000000013271
+    },
+    "baseline": {
+      "name": "global_popularity",
+      "metrics": {
+        "recall@5": 0.00910595990717411,
+        "hit_rate@5": 0.00910595990717411,
+        "ndcg@5": 0.005777339451014996,
+        "recall@10": 0.01937086135149002,
+        "hit_rate@10": 0.01937086135149002,
+        "ndcg@10": 0.009065458551049232,
+        "recall@20": 0.042384106665849686,
+        "hit_rate@20": 0.042384106665849686,
+        "ndcg@20": 0.01478540524840355,
+        "recall@50": 0.10794702172279358,
+        "hit_rate@50": 0.10794702172279358,
+        "ndcg@50": 0.027670446783304214
+      },
+      "elapsed_seconds": 0.03952830001071561
+    },
+    "comparison": {
+      "recall@5": {
+        "youtube_dnn": 0.08543046359589558,
+        "popularity": 0.00910595990717411,
+        "absolute_improvement": 0.07632450368872147,
+        "times_baseline": 9.381818552549236,
+        "relative_improvement": 8.381818552549236,
+        "relative_improvement_percent": 838.1818552549236
+      },
+      "hit_rate@5": {
+        "youtube_dnn": 0.08543046359589558,
+        "popularity": 0.00910595990717411,
+        "absolute_improvement": 0.07632450368872147,
+        "youtube_dnn_hits": 516,
+        "popularity_hits": 55,
+        "times_baseline": 9.381818552549236,
+        "relative_improvement": 8.381818552549236,
+        "relative_improvement_percent": 838.1818552549236
+      },
+      "ndcg@5": {
+        "youtube_dnn": 0.053783838845641405,
+        "popularity": 0.005777339451014996,
+        "absolute_improvement": 0.04800649939462641,
+        "times_baseline": 9.309447592904093,
+        "relative_improvement": 8.309447592904093,
+        "relative_improvement_percent": 830.9447592904093
+      },
+      "recall@10": {
+        "youtube_dnn": 0.13708609275470507,
+        "popularity": 0.01937086135149002,
+        "absolute_improvement": 0.11771523140321505,
+        "times_baseline": 7.076922923933907,
+        "relative_improvement": 6.076922923933907,
+        "relative_improvement_percent": 607.6922923933907
+      },
+      "hit_rate@10": {
+        "youtube_dnn": 0.13708609275470507,
+        "popularity": 0.01937086135149002,
+        "absolute_improvement": 0.11771523140321505,
+        "youtube_dnn_hits": 828,
+        "popularity_hits": 117,
+        "times_baseline": 7.076922923933907,
+        "relative_improvement": 6.076922923933907,
+        "relative_improvement_percent": 607.6922923933907
+      },
+      "ndcg@10": {
+        "youtube_dnn": 0.07029810383027753,
+        "popularity": 0.009065458551049232,
+        "absolute_improvement": 0.061232645279228295,
+        "times_baseline": 7.754500606275593,
+        "relative_improvement": 6.754500606275593,
+        "relative_improvement_percent": 675.4500606275593
+      },
+      "recall@20": {
+        "youtube_dnn": 0.2163907284768212,
+        "popularity": 0.042384106665849686,
+        "absolute_improvement": 0.1740066218109715,
+        "times_baseline": 5.105468665007267,
+        "relative_improvement": 4.105468665007267,
+        "relative_improvement_percent": 410.5468665007267
+      },
+      "hit_rate@20": {
+        "youtube_dnn": 0.2163907284768212,
+        "popularity": 0.042384106665849686,
+        "absolute_improvement": 0.1740066218109715,
+        "youtube_dnn_hits": 1307,
+        "popularity_hits": 256,
+        "times_baseline": 5.105468665007267,
+        "relative_improvement": 4.105468665007267,
+        "relative_improvement_percent": 410.5468665007267
+      },
+      "ndcg@20": {
+        "youtube_dnn": 0.09025917342364394,
+        "popularity": 0.01478540524840355,
+        "absolute_improvement": 0.07547376817524039,
+        "times_baseline": 6.104612752050855,
+        "relative_improvement": 5.104612752050855,
+        "relative_improvement_percent": 510.4612752050855
+      },
+      "recall@50": {
+        "youtube_dnn": 0.36473509933774834,
+        "popularity": 0.10794702172279358,
+        "absolute_improvement": 0.25678807761495476,
+        "times_baseline": 3.3788342977574954,
+        "relative_improvement": 2.3788342977574954,
+        "relative_improvement_percent": 237.88342977574953
+      },
+      "hit_rate@50": {
+        "youtube_dnn": 0.36473509933774834,
+        "popularity": 0.10794702172279358,
+        "absolute_improvement": 0.25678807761495476,
+        "youtube_dnn_hits": 2203,
+        "popularity_hits": 652,
+        "times_baseline": 3.3788342977574954,
+        "relative_improvement": 2.3788342977574954,
+        "relative_improvement_percent": 237.88342977574953
+      },
+      "ndcg@50": {
+        "youtube_dnn": 0.11960947030032708,
+        "popularity": 0.027670446783304214,
+        "absolute_improvement": 0.09193902351702286,
+        "times_baseline": 4.32264326040796,
+        "relative_improvement": 3.3226432604079603,
+        "relative_improvement_percent": 332.26432604079605
+      }
+    }
+  },
+  "ranking": {
+    "protocol": {
+      "evaluation_split": "test",
+      "test_examples": 448147,
+      "positive_examples": 125837,
+      "negative_examples": 322310,
+      "batch_size": 128
+    },
+    "model": {
+      "name": "deepfm",
+      "best_checkpoint_epoch": 5,
+      "selection_metrics": {
+        "train_loss": 0.31734562866166616,
+        "train_auc": 0.9226727137780597,
+        "validation_loss": 0.41761075168054,
+        "validation_auc": 0.8662374174560615,
+        "best_validation_auc": 0.8662374174560615,
+        "epochs_without_improvement": 0
+      },
+      "test_metrics": {
+        "loss": 0.46462860215883867,
+        "roc_auc": 0.8413824316297281
+      }
+    }
+  }
+}

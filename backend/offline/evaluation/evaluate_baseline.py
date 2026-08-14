@@ -28,7 +28,21 @@ def git_commit() -> str:
         return "unknown"
 
 
-def build_manifest(seed: int) -> dict:
+def build_manifest(
+    seed: int,
+    retrieval: dict | None = None,
+    ranking: dict | None = None,
+) -> dict:
+    retrieval_best_epoch = (
+        retrieval.get("model", {}).get("best_checkpoint_epoch")
+        if retrieval is not None
+        else None
+    )
+    ranking_best_epoch = (
+        ranking.get("model", {}).get("best_checkpoint_epoch")
+        if ranking is not None
+        else None
+    )
     return {
         "experiment": "baseline-v0",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -50,10 +64,14 @@ def build_manifest(seed: int) -> dict:
             "embedding_dimension": config.EMB_DIM,
             "negative_sample_size": config.NEG_SAMPLE_SIZE,
             "batch_size": config.BATCH_SIZE,
-            "epochs": config.EPOCHS,
+            "configured_default_epochs": config.EPOCHS,
             "learning_rate": config.LEARNING_RATE,
         },
-        "artifact_root": str(config.TEMP_DIR),
+        "training_selection": {
+            "retrieval_best_checkpoint_epoch": retrieval_best_epoch,
+            "ranking_best_checkpoint_epoch": ranking_best_epoch,
+        },
+        "artifact_root": "<FUNREC_PROCESSED_DATA_PATH>/web_project",
     }
 
 
@@ -91,7 +109,11 @@ def run_baseline_evaluation(
     )
 
     result = {
-        "manifest": build_manifest(seed),
+        "manifest": build_manifest(
+            seed,
+            retrieval=retrieval,
+            ranking=ranking,
+        ),
         "retrieval": retrieval,
         "ranking": ranking,
     }
