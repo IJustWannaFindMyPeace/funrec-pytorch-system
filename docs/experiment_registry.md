@@ -12,7 +12,7 @@
 | ID | 状态 | 运行 Git SHA | Seed | 主要改动 | Validation | Test | 结论 |
 |---|---|---|---:|---|---|---|---|
 | MIGRATION-ACCEPTANCE | completed | e69ccda | 42 | TensorFlow → PyTorch 工程迁移 | Recall@10=0.100662；DeepFM AUC=0.854670 | 不适用 | 链路验收，不与 V0 直接比较 |
-| EXP-000 | running | d65c9d6 | 42 | 三段时序切分、冲突修复、收敛校准、独立 Test | Retrieval loss=6.282928（Epoch 14）；DeepFM AUC=0.866237（Epoch 5） | Recall@10=0.137086；NDCG@10=0.070298；DeepFM AUC=0.841382 | 离线 V0 已封存；待同工件在线验证后完成 |
+| EXP-000 | completed | d65c9d6 | 42 | 三段时序切分、冲突修复、收敛校准、独立 Test、在线同工件验证 | Retrieval loss=6.282928（Epoch 14）；DeepFM AUC=0.866237（Epoch 5） | Recall@10=0.137086；NDCG@10=0.070298；DeepFM AUC=0.841382 | V0 已封存；离线评估与在线服务核心工件哈希一致 |
 
 ## EXP-000 事实记录
 
@@ -36,11 +36,14 @@
 - DeepFM Test ROC-AUC 为 0.841382，较 Validation 低 0.024855。
 - 原始 Test SHA256：`2B88A39F61C18CC46562295E114273F0D015F14EB2FA8842124C3F5DF8918B9E`。
 
-### 剩余完成条件
+### 在线验证
 
-- 在线服务加载冻结召回和排序工件。
-- 在线返回 `youtube_dnn`/`deepfm` 策略并验证部署哈希。
-- 完成后将 EXP-000 改为 `completed` 并创建 Baseline tag。
+- 宿主机训练产物、部署目录与 Docker 容器内四个核心工件 SHA256 全部一致。
+- 在线返回 `youtube_dnn` 和 `user_preference` 召回通道，排序策略为 `deepfm`。
+- 请求返回 100 个召回候选、20 个不重复推荐结果，HTTP 状态为 200。
+- `(3883, 16)` 离线向量在线变为 `(3884, 16)`，仅因索引 0 添加全零 padding/OOV 行。
+- 验证代码版本：`fe394f7`；证据：`docs/results/baseline_v0_online_verification.json`。
+- `EXP-000` 已满足 completed 定义；合并后创建 Baseline tag。
 
 ## 单次实验必须保存
 

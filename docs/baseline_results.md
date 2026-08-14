@@ -19,6 +19,7 @@
 - `docs/results/baseline_v0_run_config.json`
 - `docs/results/baseline_v0_model_hashes.json`
 - `docs/results/baseline_v0_test_metrics.json`
+- `docs/results/baseline_v0_online_verification.json`
 
 ## 数据协议
 
@@ -83,4 +84,6 @@ Validation 到 Test 的 AUC 下降 2.49 个百分点，证明存在时间外推�
 
 ## 冻结状态
 
-离线数据、训练、checkpoint、模型哈希和唯一 Test 结果均已冻结。尚未完成的最后门槛是：让在线服务加载同一组冻结部署工件，并验证召回策略、排序策略和模型哈希一致。
+离线数据、训练、checkpoint、模型哈希和唯一 Test 结果均已冻结；在线同工件验证也已完成。宿主机训练产物、部署目录与 Docker 容器内的四个核心工件 SHA256 一致。在线请求返回 100 个合并召回候选和 20 个不重复结果，召回通道包含 `youtube_dnn` 与 `user_preference`，精排策略为 `deepfm`，HTTP 状态为 200。
+
+离线物品向量为 `(3883, 16)`；在线加载器为适配从 1 开始的电影 ID，在索引 0 前置一个全零 padding/OOV 行，因此在线矩阵为 `(3884, 16)`。这不改变 3,883 个真实电影向量及其 SHA256。`EXP-000` 的数据协议、训练选择、唯一 Test 与在线部署闭环至此全部完成。
