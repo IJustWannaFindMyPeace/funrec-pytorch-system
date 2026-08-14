@@ -139,48 +139,83 @@ def process_features_for_ranking(df_movies, df_ratings, df_users):
     
     return df_merged, user_vocab, movie_vocab
 
-def split_interactions_by_time(df_interactions, test_ratio=0.2):
-    """在每个用户内部按时间划分原始交互。"""
+def split_interactions_by_time(
+    df_interactions,
+    validation_ratio=0.1,
+    test_ratio=0.2,
+):
+    """Split every user's interactions chronologically into three sets."""
+    if not 0 < validation_ratio < 1:
+        raise ValueError("validation_ratio 必须在 0 和 1 之间")
     if not 0 < test_ratio < 1:
         raise ValueError("test_ratio 必须在 0 和 1 之间")
+    if validation_ratio + test_ratio >= 1:
+        raise ValueError("validation_ratio + test_ratio 必须小于 1")
 
     ordered = df_interactions.sort_values(
         ["user_id_original", "timestamp", "_source_row"],
         kind="stable",
     ).copy()
+    group_sizes = ordered.groupby("user_id_original")[
+        "user_id_original"
+    ].transform("size")
+    short_user_count = ordered.loc[
+        group_sizes < 3,
+        "user_id_original",
+    ].nunique()
+    if short_user_count:
+        raise ValueError(
+            f"有 {short_user_count} 个用户少于 3 条交互，无法三段切分"
+        )
 
-    group_sizes = ordered.groupby("user_id_original")["user_id_original"].transform(
-        "size"
+    validation_sizes = np.maximum(
+        1,
+        np.floor(group_sizes * validation_ratio).astype(int),
     )
+    test_sizes = np.maximum(
+        1,
+        np.floor(group_sizes * test_ratio).astype(int),
+    )
+    train_sizes = group_sizes - validation_sizes - test_sizes
+    if (train_sizes < 1).any():
+        raise ValueError("切分比例使部分用户没有训练交互")
+
     positions = ordered.groupby("user_id_original").cumcount()
-
-    train_sizes = np.floor(group_sizes * (1 - test_ratio)).astype(int)
-    train_sizes = train_sizes.clip(lower=1)
-    train_sizes = np.minimum(train_sizes, group_sizes - 1)
-
     train_mask = positions < train_sizes
-    train_interactions = ordered.loc[train_mask].copy()
-    test_interactions = ordered.loc[~train_mask].copy()
+    validation_mask = (
+        (positions >= train_sizes)
+        & (positions < train_sizes + validation_sizes)
+    )
+    test_mask = positions >= train_sizes + validation_sizes
 
-    return train_interactions, test_interactions
+    return (
+        ordered.loc[train_mask].copy(),
+        ordered.loc[validation_mask].copy(),
+        ordered.loc[test_mask].copy(),
+    )
 
-def assign_labels_from_training_history(train_interactions, test_interactions):
-    """仅使用训练期评分均值，为训练和测试交互生成标签。"""
-    train_interactions = train_interactions.copy()
-    test_interactions = test_interactions.copy()
-
-    train_user_averages = train_interactions.groupby("user_id_original")[
+def assign_labels_from_training_history(
+    train_interactions,
+    validation_interactions,
+    test_interactions,
+):
+    """Create labels for every split using training-period means only."""
+    splits = [
+        train_interactions.copy(),
+        validation_interactions.copy(),
+        test_interactions.copy(),
+    ]
+    train_user_averages = splits[0].groupby("user_id_original")[
         "rating"
     ].mean()
 
-    for name, interactions in (
-        ("train", train_interactions),
-        ("test", test_interactions),
+    for name, interactions in zip(
+        ("train", "validation", "test"),
+        splits,
     ):
-        interactions["user_avg_rating"] = interactions["user_id_original"].map(
-            train_user_averages
-        )
-
+        interactions["user_avg_rating"] = interactions[
+            "user_id_original"
+        ].map(train_user_averages)
         if interactions["user_avg_rating"].isna().any():
             missing_users = interactions.loc[
                 interactions["user_avg_rating"].isna(),
@@ -189,22 +224,23 @@ def assign_labels_from_training_history(train_interactions, test_interactions):
             raise ValueError(
                 f"{name} 数据中有 {missing_users} 个用户缺少训练期评分均值"
             )
-
         interactions["conversion"] = (
             interactions["rating"] >= interactions["user_avg_rating"]
         ).astype(int)
         interactions["click"] = (
-            interactions["rating"] >= interactions["user_avg_rating"] - 1
+            interactions["rating"]
+            >= interactions["user_avg_rating"] - 1
         ).astype(int)
         interactions["exposure"] = 1
         interactions["is_click"] = interactions["click"]
 
-    return train_interactions, test_interactions
+    return tuple(splits)
 
 def generate_negative_samples(
     df_merged,
     movie_vocab,
     all_interactions=None,
+    interaction_history=None,
     excluded_pairs=None,
     neg_ratio_from_exposure=1,
     neg_ratio_random=2,
@@ -232,6 +268,8 @@ def generate_negative_samples(
 
     if all_interactions is None:
         all_interactions = df_merged
+    if interaction_history is None:
+        interaction_history = df_merged
 
     rng = random.Random(random_seed)
     excluded_by_user = defaultdict(set)
@@ -263,7 +301,7 @@ def generate_negative_samples(
     
     # 构建每个用户的交互历史（用于排除随机负样本）
     user_interactions = (
-        all_interactions.groupby("user_id_original")["movie_id"]
+        interaction_history.groupby("user_id_original")["movie_id"]
         .apply(set)
         .to_dict()
     )
@@ -432,118 +470,119 @@ def convert_to_dict(df, feature_columns, label_column="is_click"):
 def run_ranking_preprocessing(
     neg_ratio_from_exposure=1,
     neg_ratio_random=2,
-    test_ratio=0.2
+    validation_ratio=0.1,
+    test_ratio=0.2,
 ):
-    """
-    精排模型预处理主流程
-    
-    Args:
-        neg_ratio_from_exposure: 曝光困难负样本比例
-        neg_ratio_random: 随机负样本比例
-        test_ratio: 测试集比例
-    """
+    """Run strict chronological ranking preprocessing."""
     print("=" * 60)
     print("精排模型数据预处理")
     print("=" * 60)
-    
-    # 1. 加载原始数据
+
     df_movies, df_ratings, df_users = load_raw_data()
-    
-    # 2. 处理特征
     df_merged, user_vocab, movie_vocab = process_features_for_ranking(
-        df_movies, df_ratings, df_users
+        df_movies,
+        df_ratings,
+        df_users,
     )
 
-    # 3. 在每个用户内部按时间划分原始交互
-    train_interactions, test_interactions = split_interactions_by_time(
-        df_merged,
-        test_ratio=test_ratio,
+    train_interactions, validation_interactions, test_interactions = (
+        split_interactions_by_time(
+            df_merged,
+            validation_ratio=validation_ratio,
+            test_ratio=test_ratio,
+        )
     )
-
-    # 4. 仅使用训练期历史计算标签
-    train_interactions, test_interactions = (
+    train_interactions, validation_interactions, test_interactions = (
         assign_labels_from_training_history(
             train_interactions,
+            validation_interactions,
             test_interactions,
         )
     )
 
-    # 5. 分别生成训练集和测试集负样本
     train_df = generate_negative_samples(
         train_interactions,
         movie_vocab,
         all_interactions=df_merged,
+        interaction_history=train_interactions,
         neg_ratio_from_exposure=neg_ratio_from_exposure,
         neg_ratio_random=neg_ratio_random,
         random_seed=42,
     )
 
-    train_random_pairs = set(
-        zip(
-            train_df.loc[
-                train_df["_sample_type"] == "random_negative",
-                "user_id_original",
-            ],
-            train_df.loc[
-                train_df["_sample_type"] == "random_negative",
-                "movie_id",
-            ],
-        )
-    )
+    def random_pairs(frame):
+        random_rows = frame[frame["_sample_type"] == "random_negative"]
+        return set(zip(random_rows["user_id_original"], random_rows["movie_id"]))
 
-    test_df = generate_negative_samples(
-        test_interactions,
+    train_random_pairs = random_pairs(train_df)
+    validation_history = pd.concat(
+        [train_interactions, validation_interactions],
+        ignore_index=True,
+    )
+    validation_df = generate_negative_samples(
+        validation_interactions,
         movie_vocab,
         all_interactions=df_merged,
+        interaction_history=validation_history,
         excluded_pairs=train_random_pairs,
         neg_ratio_from_exposure=neg_ratio_from_exposure,
         neg_ratio_random=neg_ratio_random,
         random_seed=43,
     )
-    
-    # 6. 转换为字典格式
-    feature_columns = ["user_id", "gender", "age", "occupation", "zip_code",
-                       "movie_id", "genres", "isAdult", "startYear"]
-    
+
+    validation_random_pairs = random_pairs(validation_df)
+    test_history = pd.concat(
+        [train_interactions, validation_interactions, test_interactions],
+        ignore_index=True,
+    )
+    test_df = generate_negative_samples(
+        test_interactions,
+        movie_vocab,
+        all_interactions=df_merged,
+        interaction_history=test_history,
+        excluded_pairs=train_random_pairs | validation_random_pairs,
+        neg_ratio_from_exposure=neg_ratio_from_exposure,
+        neg_ratio_random=neg_ratio_random,
+        random_seed=44,
+    )
+
+    feature_columns = [
+        "user_id", "gender", "age", "occupation", "zip_code",
+        "movie_id", "genres", "isAdult", "startYear",
+    ]
     train_data = convert_to_dict(train_df, feature_columns, "is_click")
+    validation_data = convert_to_dict(
+        validation_df,
+        feature_columns,
+        "is_click",
+    )
     test_data = convert_to_dict(test_df, feature_columns, "is_click")
-    
-    samples = {"train": train_data, "test": test_data}
-    
-    # 7. 构建特征词典 (嵌入词汇表大小)
+    samples = {
+        "train": train_data,
+        "validation": validation_data,
+        "test": test_data,
+    }
+
     vocab_dict = {**user_vocab, **movie_vocab}
-    feature_dict = {k: len(v) + 1 for k, v in vocab_dict.items()}  # +1 for padding/unknown
-    
-    # 8. 保存输出
+    feature_dict = {key: len(values) + 1 for key, values in vocab_dict.items()}
+
     print("保存处理后的数据...")
-    ranking_data_path = config.TEMP_DIR / "ranking_train_eval_sample.pkl"
-    ranking_feature_dict_path = config.TEMP_DIR / "ranking_feature_dict.pkl"
-    ranking_vocab_dict_path = config.TEMP_DIR / "ranking_vocab_dict.pkl"
-    
-    pickle.dump(samples, open(ranking_data_path, "wb"))
-    pickle.dump(feature_dict, open(ranking_feature_dict_path, "wb"))
-    pickle.dump(vocab_dict, open(ranking_vocab_dict_path, "wb"))
-    
-    print(f"\n保存到:")
-    print(f"  - {ranking_data_path}")
-    print(f"  - {ranking_feature_dict_path}")
-    print(f"  - {ranking_vocab_dict_path}")
-    
-    print("\n" + "=" * 60)
-    print("预处理完成!")
-    print("=" * 60)
-    
-    # Print summary
-    print("\n数据摘要:")
+    pickle.dump(samples, open(config.RANKING_TRAIN_DATA_PATH, "wb"))
+    pickle.dump(feature_dict, open(config.RANKING_FEATURE_DICT_PATH, "wb"))
+    pickle.dump(vocab_dict, open(config.RANKING_VOCAB_DICT_PATH, "wb"))
+
+    print()
+    print("数据摘要:")
     print(f"  特征: {feature_columns}")
     print(f"  特征词汇表大小: {feature_dict}")
-    print(f"  训练集样本: {len(train_data['user_id'])}")
-    print(f"  测试集样本: {len(test_data['user_id'])}")
-    print(f"  训练集正样本比例: {train_data['is_click'].mean():.2%}")
-    print(f"  测试集正样本比例: {test_data['is_click'].mean():.2%}")
-    
-    return samples, feature_dict
+    for split_name, split_data in samples.items():
+        print(f"  {split_name} 样本: {len(split_data['user_id'])}")
+        print(
+            f"  {split_name} 正样本比例: "
+            f"{split_data['is_click'].mean():.2%}"
+        )
 
+    return samples, feature_dict
 
 if __name__ == "__main__":
     run_ranking_preprocessing()

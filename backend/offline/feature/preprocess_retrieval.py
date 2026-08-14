@@ -151,73 +151,92 @@ def add_padding(val, padding_value, max_seq_len):
 def generate_train_eval_samples(
         data_df, user_columns, item_columns, max_hist_seq_len=10, max_feat_seq_len=10, padding_value=0
     ):
+    """Build strict chronological train, validation, and test samples.
+
+    For every eligible user, the penultimate interaction is the validation
+    target and the final interaction is the test target. Earlier interactions
+    generate sliding-window training examples. This prevents either held-out
+    split from participating in model fitting or checkpoint selection.
     """
-    生成训练和评估样本
-    
-    使用滑动窗口方式构建序列样本：
-    - 测试数据：每个用户的最后一个物品
-    - 训练数据：滑动窗口生成的历史序列
-    
-    Args:
-        data_df: 包含特征的 DataFrame
-        user_columns: 用户特征列
-        item_columns: 物品特征列
-        max_hist_seq_len: 历史序列最大长度
-        max_feat_seq_len: 特征序列最大长度
-        padding_value: 填充值
-    
-    Returns:
-        包含 train 和 test 数据的字典
-    """
-    data_df.sort_values(
+    data_df = data_df.sort_values(
         ["timestamp", "_source_row"],
         kind="stable",
-        inplace=True,
     )
     train_data_dict = defaultdict(list)
+    validation_data_dict = defaultdict(list)
     test_data_dict = defaultdict(list)
-    
-    print("生成训练和评估样本...")
-    for user_id, grouped_feats in tqdm(data_df.groupby("user_id")):            
-        if len(grouped_feats["movie_id"]) < 2:
+
+    def append_evaluation_sample(output, user_id, grouped_feats, target_index):
+        output["user_id"].append(user_id)
+        for col in user_columns:
+            output[col].append(grouped_feats[col].iloc[0])
+        for col in item_columns:
+            values = grouped_feats[col].tolist()
+            output["hist_" + col].append(
+                add_padding(
+                    values[:target_index],
+                    padding_value,
+                    max_hist_seq_len,
+                )
+            )
+            output[col].append(
+                add_padding(
+                    values[target_index],
+                    padding_value,
+                    max_feat_seq_len,
+                )
+            )
+
+    print("生成训练、验证和测试样本...")
+    for user_id, grouped_feats in tqdm(data_df.groupby("user_id")):
+        len_hist_seq = len(grouped_feats["movie_id"])
+        if len_hist_seq < 3:
             continue
 
-        # --- 测试数据（最后一个物品）---
-        # 测试集用户特征
-        test_data_dict["user_id"].append(user_id)
-        for col in user_columns:
-            test_data_dict[col].append(grouped_feats[col].iloc[0])
-        
-        len_hist_seq = len(grouped_feats["movie_id"])
-        
-        # 测试集物品特征
-        for col in item_columns:
-            test_data_dict["hist_" + col].append(add_padding(grouped_feats[col].tolist()[:-1], padding_value, max_hist_seq_len))
-            test_data_dict[col].append(add_padding(grouped_feats[col].tolist()[-1], padding_value, max_feat_seq_len))
+        append_evaluation_sample(
+            validation_data_dict,
+            user_id,
+            grouped_feats,
+            len_hist_seq - 2,
+        )
+        append_evaluation_sample(
+            test_data_dict,
+            user_id,
+            grouped_feats,
+            len_hist_seq - 1,
+        )
 
-        # --- 训练数据（滑动窗口）---
-        for i in range(1, len_hist_seq - 1):
-            # 修复：为每个训练样本添加用户特征
+        for i in range(1, len_hist_seq - 2):
             train_data_dict["user_id"].append(user_id)
             for col in user_columns:
                 train_data_dict[col].append(grouped_feats[col].iloc[0])
-
-            # 训练集物品特征
             for col in item_columns:
-                train_data_dict["hist_" + col].append(add_padding(grouped_feats[col].tolist()[:i], padding_value, max_hist_seq_len))
-                train_data_dict[col].append(add_padding(grouped_feats[col].tolist()[i], padding_value, max_hist_seq_len))
+                values = grouped_feats[col].tolist()
+                train_data_dict["hist_" + col].append(
+                    add_padding(
+                        values[:i],
+                        padding_value,
+                        max_hist_seq_len,
+                    )
+                )
+                train_data_dict[col].append(
+                    add_padding(
+                        values[i],
+                        padding_value,
+                        max_feat_seq_len,
+                    )
+                )
 
-    # 转换为 numpy 数组
     print("转换为 numpy 数组...")
-    final_train = {}
-    for k, v in train_data_dict.items():
-        final_train[k] = np.array(v)
-        
-    final_test = {}
-    for k, v in test_data_dict.items():
-        final_test[k] = np.array(v)
 
-    return {"train": final_train, "test": final_test}
+    def to_numpy(data):
+        return {key: np.asarray(value) for key, value in data.items()}
+
+    return {
+        "train": to_numpy(train_data_dict),
+        "validation": to_numpy(validation_data_dict),
+        "test": to_numpy(test_data_dict),
+    }
 
 def run_retrieval_preprocessing():
     """召回模型预处理主流程"""

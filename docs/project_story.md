@@ -41,4 +41,3 @@
 ## 证据规则
 
 PPT 中的每个数字必须能够追溯到 `experiment_registry.md`、机器生成的 metrics、训练日志、checkpoint 和 Git commit。失败实验同样保留，用于解释判断过程。
-

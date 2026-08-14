@@ -87,7 +87,7 @@ def build_data_loaders(
 ):
     """Build train and validation data loaders."""
     train_dataset = RetrievalDataset(samples["train"])
-    validation_dataset = RetrievalDataset(samples["test"])
+    validation_dataset = RetrievalDataset(samples["validation"])
 
     pin_memory = device.type == "cuda"
 

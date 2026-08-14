@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from offline.feature.preprocess_ranking import (
     assign_labels_from_training_history,
@@ -8,41 +9,50 @@ from offline.feature.preprocess_ranking import (
 )
 
 
-def test_split_interactions_by_time_is_per_user_and_stable():
+def test_split_interactions_by_time_is_per_user_stable_and_disjoint():
     interactions = pd.DataFrame(
         {
-            "user_id_original": ["1", "1", "1", "1", "1", "2", "2"],
-            "timestamp": [20, 10, 20, 20, 30, 5, 6],
-            "_source_row": [0, 1, 2, 3, 4, 5, 6],
+            "user_id_original": [
+                "1", "1", "1", "1", "1",
+                "2", "2", "2", "2",
+            ],
+            "timestamp": [20, 10, 20, 20, 30, 5, 6, 7, 8],
+            "_source_row": list(range(9)),
         }
     )
 
-    train, test = split_interactions_by_time(
+    train, validation, test = split_interactions_by_time(
         interactions,
-        test_ratio=0.4,
+        validation_ratio=0.2,
+        test_ratio=0.2,
     )
 
-    user_1_train = train.loc[
-        train["user_id_original"] == "1",
-        "_source_row",
-    ].tolist()
-    user_1_test = test.loc[
-        test["user_id_original"] == "1",
-        "_source_row",
-    ].tolist()
-
-    assert user_1_train == [1, 0, 2]
-    assert user_1_test == [3, 4]
-
-    assert set(train["user_id_original"]) == {"1", "2"}
-    assert set(test["user_id_original"]) == {"1", "2"}
+    assert train.loc[train["user_id_original"] == "1", "_source_row"].tolist() == [1, 0, 2]
+    assert validation.loc[validation["user_id_original"] == "1", "_source_row"].tolist() == [3]
+    assert test.loc[test["user_id_original"] == "1", "_source_row"].tolist() == [4]
+    assert set(train["_source_row"]).isdisjoint(validation["_source_row"])
     assert set(train["_source_row"]).isdisjoint(test["_source_row"])
-    assert len(train) + len(test) == len(interactions)
+    assert set(validation["_source_row"]).isdisjoint(test["_source_row"])
+    assert len(train) + len(validation) + len(test) == len(interactions)
 
     train_max = train.groupby("user_id_original")["timestamp"].max()
+    validation_min = validation.groupby("user_id_original")["timestamp"].min()
+    validation_max = validation.groupby("user_id_original")["timestamp"].max()
     test_min = test.groupby("user_id_original")["timestamp"].min()
-    assert (train_max <= test_min).all()
+    assert (train_max <= validation_min).all()
+    assert (validation_max <= test_min).all()
 
+
+def test_split_rejects_users_without_three_interactions():
+    interactions = pd.DataFrame(
+        {
+            "user_id_original": ["1", "1"],
+            "timestamp": [1, 2],
+            "_source_row": [0, 1],
+        }
+    )
+    with pytest.raises(ValueError, match="少于 3 条交互"):
+        split_interactions_by_time(interactions)
 
 def test_labels_use_training_history_only():
     train = pd.DataFrame(
@@ -51,16 +61,21 @@ def test_labels_use_training_history_only():
             "rating": [4.0, 8.0, 2.0, 10.0],
         }
     )
-    test = pd.DataFrame(
+    validation = pd.DataFrame(
         {
             "user_id_original": ["1", "2"],
             "rating": [5.0, 5.0],
         }
     )
+    test = pd.DataFrame(
+        {
+            "user_id_original": ["1", "2"],
+            "rating": [9.0, 1.0],
+        }
+    )
 
-    labeled_train, labeled_test = assign_labels_from_training_history(
-        train,
-        test,
+    labeled_train, labeled_validation, labeled_test = (
+        assign_labels_from_training_history(train, validation, test)
     )
 
     assert labeled_train["user_avg_rating"].tolist() == [
@@ -72,9 +87,12 @@ def test_labels_use_training_history_only():
     assert labeled_train["is_click"].tolist() == [0, 1, 0, 1]
     assert labeled_train["conversion"].tolist() == [0, 1, 0, 1]
 
+    assert labeled_validation["user_avg_rating"].tolist() == [6.0, 6.0]
+    assert labeled_validation["is_click"].tolist() == [1, 1]
+    assert labeled_validation["conversion"].tolist() == [0, 0]
     assert labeled_test["user_avg_rating"].tolist() == [6.0, 6.0]
-    assert labeled_test["is_click"].tolist() == [1, 1]
-    assert labeled_test["conversion"].tolist() == [0, 0]
+    assert labeled_test["is_click"].tolist() == [1, 0]
+    assert labeled_test["conversion"].tolist() == [1, 0]
 
 
 def test_random_negatives_are_deterministic_unique_and_excludable():
