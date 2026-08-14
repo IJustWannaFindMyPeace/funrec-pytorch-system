@@ -211,3 +211,80 @@ def test_random_negatives_are_deterministic_unique_and_excludable():
     )
 
     assert first_pairs.isdisjoint(second_pairs)
+
+
+def _ranking_row(user_id, movie_id, is_click, timestamp):
+    return {
+        "user_id": user_id,
+        "user_id_original": str(user_id),
+        "gender": 1,
+        "age": 1,
+        "occupation": 1,
+        "zip_code": 1,
+        "movie_id": movie_id,
+        "movie_id_original": str(movie_id),
+        "genres": 1,
+        "isAdult": 1,
+        "startYear": 1,
+        "rating": 5.0 if is_click else 1.0,
+        "timestamp": timestamp,
+        "is_click": is_click,
+    }
+
+
+def test_full_history_excludes_future_interactions_from_random_negatives():
+    current = pd.DataFrame([_ranking_row(1, 1, 1, 1)])
+    future = _ranking_row(1, 2, 1, 2)
+    catalog = [
+        _ranking_row(2, movie_id, 1, movie_id)
+        for movie_id in range(3, 8)
+    ]
+    all_interactions = pd.concat(
+        [current, pd.DataFrame([future, *catalog])],
+        ignore_index=True,
+    )
+
+    result = generate_negative_samples(
+        current,
+        {"movie_id": np.arange(1, 8)},
+        all_interactions=all_interactions,
+        interaction_history=all_interactions,
+        neg_ratio_from_exposure=0,
+        neg_ratio_random=2,
+        random_seed=42,
+    )
+    random_movies = set(
+        result.loc[
+            result["_sample_type"] == "random_negative",
+            "movie_id",
+        ]
+    )
+
+    assert 1 not in random_movies
+    assert 2 not in random_movies
+
+
+def test_all_hard_negatives_keep_users_without_positive_samples():
+    interactions = pd.DataFrame(
+        [
+            _ranking_row(1, 1, 1, 1),
+            _ranking_row(2, 2, 0, 1),
+            _ranking_row(2, 3, 0, 2),
+        ]
+    )
+
+    result = generate_negative_samples(
+        interactions,
+        {"movie_id": np.arange(1, 4)},
+        all_interactions=interactions,
+        interaction_history=interactions,
+        neg_ratio_random=0,
+        include_all_hard_negatives=True,
+        random_seed=42,
+    )
+
+    assert set(result["user_id_original"]) == {"1", "2"}
+    user_two = result[result["user_id_original"] == "2"]
+    assert len(user_two) == 2
+    assert (user_two["is_click"] == 0).all()
+    assert (user_two["_sample_type"] == "hard_negative").all()

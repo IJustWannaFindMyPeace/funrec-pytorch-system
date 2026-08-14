@@ -244,6 +244,7 @@ def generate_negative_samples(
     excluded_pairs=None,
     neg_ratio_from_exposure=1,
     neg_ratio_random=2,
+    include_all_hard_negatives=False,
     random_seed=42,
 ):
     """
@@ -314,27 +315,37 @@ def generate_negative_samples(
     
     negative_samples = []
     
-    # 1. 按用户采样困难负样本（曝光但未点击）
-    if neg_ratio_from_exposure > 0:
+    # 1. 构造困难负样本（曝光但未点击）
+    # 训练集按比例采样以控制类别分布；验证和测试保留全部真实
+    # 负反馈，避免只评估在该窗口中至少有一个正样本的用户。
+    if include_all_hard_negatives:
+        if len(hard_negative_pool) > 0:
+            hard_negative_df = hard_negative_pool.copy()
+            hard_negative_df["is_click"] = 0
+            hard_negative_df["_sample_type"] = "hard_negative"
+            negative_samples.append(hard_negative_df)
+            print(
+                "    保留了 "
+                f"{len(hard_negative_df)} 个全部真实困难负样本"
+            )
+    elif neg_ratio_from_exposure > 0:
         print(f"  为每个正样本采样 {neg_ratio_from_exposure} 个困难负样本...")
         hard_neg_list = []
         hard_neg_count = 0
-        
-        # 按用户分组正样本以提高处理效率
-        for user_id, user_positives in tqdm(positive_samples.groupby("user_id_original"), 
-                                             desc="困难负样本 (每个用户)"):
-            # 获取该用户的困难负样本池
+
+        for user_id, user_positives in tqdm(
+            positive_samples.groupby("user_id_original"),
+            desc="困难负样本 (每个用户)",
+        ):
             user_hard_neg_pool = user_hard_negatives.get(user_id)
-            
+
             if user_hard_neg_pool is None or len(user_hard_neg_pool) == 0:
                 continue
-            
-            # 计算该用户需要采样的困难负样本数
+
             n_positives = len(user_positives)
             n_hard_neg_needed = n_positives * neg_ratio_from_exposure
-            
-            # 从该用户的困难负样本池中采样
             n_to_sample = min(len(user_hard_neg_pool), n_hard_neg_needed)
+
             if n_to_sample > 0:
                 sampled = user_hard_neg_pool.sample(
                     n=n_to_sample,
@@ -343,14 +354,14 @@ def generate_negative_samples(
                 )
                 hard_neg_list.append(sampled)
                 hard_neg_count += len(sampled)
-        
+
         if hard_neg_list:
             hard_neg_df = pd.concat(hard_neg_list, ignore_index=True)
             hard_neg_df["is_click"] = 0
             hard_neg_df["_sample_type"] = "hard_negative"
             negative_samples.append(hard_neg_df)
             print(f"    添加了 {hard_neg_count} 个困难负样本")
-    
+
     # 2. 生成随机负样本（用户从未交互过的物品）
     if neg_ratio_random > 0:
         print(f"  为每个正样本采样 {neg_ratio_random} 个随机负样本...")
@@ -504,7 +515,7 @@ def run_ranking_preprocessing(
         train_interactions,
         movie_vocab,
         all_interactions=df_merged,
-        interaction_history=train_interactions,
+        interaction_history=df_merged,
         neg_ratio_from_exposure=neg_ratio_from_exposure,
         neg_ratio_random=neg_ratio_random,
         random_seed=42,
@@ -515,34 +526,28 @@ def run_ranking_preprocessing(
         return set(zip(random_rows["user_id_original"], random_rows["movie_id"]))
 
     train_random_pairs = random_pairs(train_df)
-    validation_history = pd.concat(
-        [train_interactions, validation_interactions],
-        ignore_index=True,
-    )
     validation_df = generate_negative_samples(
         validation_interactions,
         movie_vocab,
         all_interactions=df_merged,
-        interaction_history=validation_history,
+        interaction_history=df_merged,
         excluded_pairs=train_random_pairs,
         neg_ratio_from_exposure=neg_ratio_from_exposure,
         neg_ratio_random=neg_ratio_random,
+        include_all_hard_negatives=True,
         random_seed=43,
     )
 
     validation_random_pairs = random_pairs(validation_df)
-    test_history = pd.concat(
-        [train_interactions, validation_interactions, test_interactions],
-        ignore_index=True,
-    )
     test_df = generate_negative_samples(
         test_interactions,
         movie_vocab,
         all_interactions=df_merged,
-        interaction_history=test_history,
+        interaction_history=df_merged,
         excluded_pairs=train_random_pairs | validation_random_pairs,
         neg_ratio_from_exposure=neg_ratio_from_exposure,
         neg_ratio_random=neg_ratio_random,
+        include_all_hard_negatives=True,
         random_seed=44,
     )
 
