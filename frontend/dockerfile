@@ -1,7 +1,7 @@
 # 多阶段构建生产环境
 
 # 构建阶段
-FROM node:22-alpine as build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 

@@ -68,6 +68,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - MODEL_DEPLOY_DIR=/app/tmp/web_project/deployed_models
+      - FUNREC_RAW_DATA_PATH=/data
+      - FUNREC_PROCESSED_DATA_PATH=/app/tmp
       - DATA_DIR=/data
       - POSTER_DIR=/data/image
       - DEBUG=true
@@ -83,7 +85,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     networks:
       - funrec-network
 
