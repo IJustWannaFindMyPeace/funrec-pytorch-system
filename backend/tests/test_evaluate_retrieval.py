@@ -6,7 +6,7 @@ from offline.evaluation.evaluate_retrieval import (
 )
 
 
-def test_calculate_comparison_includes_lift_and_hit_counts():
+def test_calculate_comparison_includes_ratio_improvement_and_hit_counts():
     model_metrics = {
         "hit_rate@10": 0.10,
         "ndcg@10": 0.05,
@@ -26,13 +26,18 @@ def test_calculate_comparison_includes_lift_and_hit_counts():
         "youtube_dnn": 0.10,
         "popularity": 0.02,
         "absolute_improvement": pytest.approx(0.08),
-        "relative_lift": pytest.approx(5.0),
+        "times_baseline": pytest.approx(5.0),
+        "relative_improvement": pytest.approx(4.0),
+        "relative_improvement_percent": pytest.approx(400.0),
         "youtube_dnn_hits": 100,
         "popularity_hits": 20,
     }
-    assert comparison["ndcg@10"]["relative_lift"] == pytest.approx(
+    assert comparison["ndcg@10"]["times_baseline"] == pytest.approx(
         5.0
     )
+    assert comparison["ndcg@10"][
+        "relative_improvement_percent"
+    ] == pytest.approx(400.0)
 
 
 @pytest.mark.parametrize(

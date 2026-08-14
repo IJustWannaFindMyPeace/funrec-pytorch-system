@@ -108,7 +108,7 @@ def build_data_loaders(
 ):
     """Build shuffled training and ordered validation loaders."""
     train_dataset = RankingDataset(samples["train"])
-    validation_dataset = RankingDataset(samples["test"])
+    validation_dataset = RankingDataset(samples["validation"])
 
     pin_memory = device.type == "cuda"
 

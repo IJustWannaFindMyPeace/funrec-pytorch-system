@@ -1,0 +1,78 @@
+﻿{
+    "experiment":  "baseline-v0",
+    "git_commit":  "fe394f7e59a826ed48282a762cc94c257572d1a8",
+    "verified_at":  "2026-08-14T13:15:39.0493051Z",
+    "deployment":  {
+                       "artifact_root":  "\u003cFUNREC_PROCESSED_DATA_PATH\u003e/web_project/deployed_models",
+                       "all_core_hashes_match":  true,
+                       "artifacts":  [
+                                         {
+                                             "artifact":  "retrieval_user_model",
+                                             "deployed_path":  "\u003cFUNREC_PROCESSED_DATA_PATH\u003e/web_project/deployed_models/recall/retrieval_user_model.pt",
+                                             "expected_sha256":  "2483205ad6ce994d5326fd3c6c1848442f8334c935694647f8c7b1e7602c6600",
+                                             "container_sha256":  "2483205ad6ce994d5326fd3c6c1848442f8334c935694647f8c7b1e7602c6600",
+                                             "hash_match":  true
+                                         },
+                                         {
+                                             "artifact":  "item_embeddings",
+                                             "deployed_path":  "\u003cFUNREC_PROCESSED_DATA_PATH\u003e/web_project/deployed_models/recall/item_embeddings.npy",
+                                             "expected_sha256":  "f281d5f16200df43d56ce56800b7b59b6a1fe860ad934d1834c2dc742c403f86",
+                                             "container_sha256":  "f281d5f16200df43d56ce56800b7b59b6a1fe860ad934d1834c2dc742c403f86",
+                                             "hash_match":  true
+                                         },
+                                         {
+                                             "artifact":  "movie_ids",
+                                             "deployed_path":  "\u003cFUNREC_PROCESSED_DATA_PATH\u003e/web_project/deployed_models/recall/movie_ids.npy",
+                                             "expected_sha256":  "80e1cb0adba099946359462305e6df8c83e957800d212f38a4431d823f759339",
+                                             "container_sha256":  "80e1cb0adba099946359462305e6df8c83e957800d212f38a4431d823f759339",
+                                             "hash_match":  true
+                                         },
+                                         {
+                                             "artifact":  "ranking_model",
+                                             "deployed_path":  "\u003cFUNREC_PROCESSED_DATA_PATH\u003e/web_project/deployed_models/ranking/ranking_model.pt",
+                                             "expected_sha256":  "79d6227e1e6f76ab5fd69cc8ee44d72442418b699c1bf559e311e6907791d209",
+                                             "container_sha256":  "79d6227e1e6f76ab5fd69cc8ee44d72442418b699c1bf559e311e6907791d209",
+                                             "hash_match":  true
+                                         }
+                                     ]
+                   },
+    "retrieval_embedding_alignment":  {
+                                          "exported_shape":  [
+                                                                 3883,
+                                                                 16
+                                                             ],
+                                          "online_padded_shape":  [
+                                                                      3884,
+                                                                      16
+                                                                  ],
+                                          "padding_index":  0,
+                                          "real_embeddings_start_index":  1,
+                                          "interpretation":  "One zero padding/OOV row is prepended for one-based movie IDs."
+                                      },
+    "online_request":  {
+                           "endpoint":  "/api/recommendations/recommend?recall_k=100\u0026top_k=20",
+                           "user_id":  1,
+                           "http_status":  200,
+                           "item_count":  20,
+                           "unique_movie_count":  20,
+                           "recall_count":  100,
+                           "recall_types":  [
+                                                "user_preference",
+                                                "youtube_dnn"
+                                            ],
+                           "ranking_strategy":  "deepfm"
+                       },
+    "pipeline":  {
+                     "recall_ready":  true,
+                     "ranking_ready":  true,
+                     "reranking_ready":  true,
+                     "cold_start_ready":  true,
+                     "retrieval_model":  "YouTubeDNN",
+                     "ranking_model":  "DeepFM",
+                     "reranking_strategies":  [
+                                                  "genre_dispersion",
+                                                  "decade_dispersion"
+                                              ]
+                 },
+    "conclusion":  "The online backend loaded and served the same frozen Baseline V0 artifacts evaluated offline."
+}

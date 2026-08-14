@@ -1,0 +1,336 @@
+{
+  "experiment": "baseline-v0",
+  "git_commit": "126641b4cc0a566ff9c9950f4776e74e311f0d72",
+  "artifact_root": "<FUNREC_PROCESSED_DATA_PATH>/web_project",
+  "raw_time_split": {
+    "raw_interactions": 1000209,
+    "train_interactions": 705170,
+    "validation_interactions": 97383,
+    "test_interactions": 197656,
+    "users": 6040,
+    "source_row_overlap": {
+      "train_validation": 0,
+      "train_test": 0,
+      "validation_test": 0
+    },
+    "time_boundary_violations": {
+      "train_after_validation": 0,
+      "validation_after_test": 0
+    },
+    "positive_interactions": {
+      "train": 499640,
+      "validation": 64190,
+      "test": 125837
+    },
+    "protocol": {
+      "validation_ratio": 0.1,
+      "test_ratio": 0.2,
+      "label_threshold": "rating >= train_user_mean - 1",
+      "catalog_setting": "closed-catalog transductive"
+    }
+  },
+  "retrieval": {
+    "splits": {
+      "train": {
+        "examples": 982089,
+        "unique_users": 6040,
+        "unique_movies": 3700,
+        "duplicate_target_pairs": 0,
+        "target_user_oov": 0,
+        "target_movie_oov": 0,
+        "target_in_history": 0,
+        "history_shape": [
+          982089,
+          10
+        ]
+      },
+      "validation": {
+        "examples": 6040,
+        "unique_users": 6040,
+        "unique_movies": 1951,
+        "duplicate_target_pairs": 0,
+        "target_user_oov": 0,
+        "target_movie_oov": 0,
+        "target_in_history": 0,
+        "history_shape": [
+          6040,
+          10
+        ]
+      },
+      "test": {
+        "examples": 6040,
+        "unique_users": 6040,
+        "unique_movies": 1874,
+        "duplicate_target_pairs": 0,
+        "target_user_oov": 0,
+        "target_movie_oov": 0,
+        "target_in_history": 0,
+        "history_shape": [
+          6040,
+          10
+        ]
+      }
+    },
+    "pair_overlap": {
+      "train__validation": 0,
+      "train__test": 0,
+      "validation__test": 0
+    },
+    "feature_ranges": {
+      "train": {
+        "user_id": {
+          "minimum": 1,
+          "maximum": 6040,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "movie_id": {
+          "minimum": 1,
+          "maximum": 3883,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        }
+      },
+      "validation": {
+        "user_id": {
+          "minimum": 1,
+          "maximum": 6040,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "movie_id": {
+          "minimum": 1,
+          "maximum": 3883,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        }
+      },
+      "test": {
+        "user_id": {
+          "minimum": 1,
+          "maximum": 6040,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "movie_id": {
+          "minimum": 1,
+          "maximum": 3883,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        }
+      }
+    }
+  },
+  "ranking": {
+    "splits": {
+      "train": {
+        "examples": 1703230,
+        "positives": 499640,
+        "negatives": 1203590,
+        "positive_rate": 0.29334852016462837,
+        "unique_users": 6040,
+        "unique_movies": 3706,
+        "duplicate_user_movie_label_rows": 0,
+        "within_split_label_conflicts": 0
+      },
+      "validation": {
+        "examples": 225347,
+        "positives": 64190,
+        "negatives": 161157,
+        "positive_rate": 0.284849587525017,
+        "unique_users": 6040,
+        "unique_movies": 3706,
+        "duplicate_user_movie_label_rows": 0,
+        "within_split_label_conflicts": 0
+      },
+      "test": {
+        "examples": 448147,
+        "positives": 125837,
+        "negatives": 322310,
+        "positive_rate": 0.28079402517477525,
+        "unique_users": 6040,
+        "unique_movies": 3706,
+        "duplicate_user_movie_label_rows": 0,
+        "within_split_label_conflicts": 0
+      }
+    },
+    "cross_split_conflicts": {
+      "train_negative_vs_validation_positive": 0,
+      "train_negative_vs_test_positive": 0,
+      "validation_negative_vs_test_positive": 0,
+      "train_vs_validation_any_pair_overlap": 0,
+      "train_vs_test_any_pair_overlap": 0,
+      "validation_vs_test_any_pair_overlap": 0
+    },
+    "feature_ranges": {
+      "train": {
+        "user_id": {
+          "minimum": 1,
+          "maximum": 6040,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "gender": {
+          "minimum": 1,
+          "maximum": 2,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "age": {
+          "minimum": 1,
+          "maximum": 7,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "occupation": {
+          "minimum": 1,
+          "maximum": 21,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "zip_code": {
+          "minimum": 1,
+          "maximum": 3439,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "movie_id": {
+          "minimum": 1,
+          "maximum": 3883,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "genres": {
+          "minimum": 1,
+          "maximum": 18,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "isAdult": {
+          "minimum": 1,
+          "maximum": 3,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "startYear": {
+          "minimum": 1,
+          "maximum": 86,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        }
+      },
+      "validation": {
+        "user_id": {
+          "minimum": 1,
+          "maximum": 6040,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "gender": {
+          "minimum": 1,
+          "maximum": 2,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "age": {
+          "minimum": 1,
+          "maximum": 7,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "occupation": {
+          "minimum": 1,
+          "maximum": 21,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "zip_code": {
+          "minimum": 1,
+          "maximum": 3439,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "movie_id": {
+          "minimum": 1,
+          "maximum": 3883,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "genres": {
+          "minimum": 1,
+          "maximum": 18,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "isAdult": {
+          "minimum": 1,
+          "maximum": 3,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "startYear": {
+          "minimum": 1,
+          "maximum": 86,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        }
+      },
+      "test": {
+        "user_id": {
+          "minimum": 1,
+          "maximum": 6040,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "gender": {
+          "minimum": 1,
+          "maximum": 2,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "age": {
+          "minimum": 1,
+          "maximum": 7,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "occupation": {
+          "minimum": 1,
+          "maximum": 21,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "zip_code": {
+          "minimum": 1,
+          "maximum": 3439,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "movie_id": {
+          "minimum": 1,
+          "maximum": 3883,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "genres": {
+          "minimum": 1,
+          "maximum": 18,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "isAdult": {
+          "minimum": 1,
+          "maximum": 3,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        },
+        "startYear": {
+          "minimum": 1,
+          "maximum": 86,
+          "zero_count": 0,
+          "out_of_range_count": 0
+        }
+      }
+    }
+  }
+}

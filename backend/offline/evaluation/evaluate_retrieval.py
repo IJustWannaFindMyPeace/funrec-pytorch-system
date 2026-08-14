@@ -134,21 +134,28 @@ def calculate_comparison(
     baseline_metrics: Dict[str, float],
     test_users: int,
 ) -> Dict[str, dict]:
-    """Calculate absolute and relative improvements."""
+    """Calculate absolute improvement, ratio, and relative improvement."""
     comparison = {}
 
     for name, model_value in model_metrics.items():
         baseline_value = baseline_metrics[name]
+        absolute_improvement = model_value - baseline_value
+        if baseline_value > 0:
+            times_baseline = model_value / baseline_value
+            relative_improvement = absolute_improvement / baseline_value
+        else:
+            times_baseline = None
+            relative_improvement = None
 
         comparison[name] = {
             "youtube_dnn": model_value,
             "popularity": baseline_value,
-            "absolute_improvement": (
-                model_value - baseline_value
-            ),
-            "relative_lift": (
-                model_value / baseline_value
-                if baseline_value > 0
+            "absolute_improvement": absolute_improvement,
+            "times_baseline": times_baseline,
+            "relative_improvement": relative_improvement,
+            "relative_improvement_percent": (
+                relative_improvement * 100
+                if relative_improvement is not None
                 else None
             ),
         }
