@@ -12,7 +12,7 @@
 | ID | 状态 | Git SHA | Seed | 主要改动 | Validation | Test | 结论 |
 |---|---|---|---:|---|---|---|---|
 | MIGRATION-ACCEPTANCE | completed | e69ccda | 42 | TensorFlow → PyTorch 工程迁移 | Recall@10=0.100662; DeepFM AUC=0.854670 | 不适用 | 证明迁移与全链路可运行，不作为独立 Test 结果 |
-| EXP-000 | planned | TBD | 42 | 严格时序三段切分的 Baseline V0 | TBD | TBD | 待运行 |
+| EXP-000 | running | 126641b | 42 | 严格时序三段切分、负采样冲突修复与独立 Test 入口 | 协议审计通过；112 tests | 未运行 | 数据协议已冻结，待 smoke 与正式训练 |
 
 ## 单次实验必须保存
 
@@ -44,3 +44,12 @@
 - Seed 42 全量训练完成。
 - 所有指标和环境信息自动保存。
 - 在线链路成功加载冻结工件。
+
+### 数据协议审计
+
+- 原始交互：1,000,209；用户：6,040。
+- Ranking Train/Validation/Test：1,703,230 / 225,347 / 448,147 个采样样本。
+- Retrieval Train/Validation/Test：982,089 / 6,040 / 6,040 个样本。
+- 六类跨 split 用户—电影冲突均为 0。
+- Validation/Test 用户覆盖均为 6,040。
+- 审计文件：`docs/results/baseline_v0_data_audit.json`。
