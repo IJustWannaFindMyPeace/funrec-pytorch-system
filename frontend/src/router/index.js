@@ -19,6 +19,7 @@ const routes = [
   },
   {
     path: '/auth',
+    alias: '/login',
     name: 'Auth',
     component: Auth,
     meta: { guest: true }
