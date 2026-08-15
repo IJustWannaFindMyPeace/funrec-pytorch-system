@@ -63,9 +63,21 @@ def predict_validation(validation, device, batch_size):
         map_location="cpu",
         weights_only=True,
     )
+    checkpoint_metrics = checkpoint.get("metrics", {})
+    history_pooling = checkpoint_metrics.get(
+        "history_pooling", "masked_mean"
+    )
+    max_sequence_length = int(
+        checkpoint_metrics.get(
+            "max_sequence_length",
+            np.asarray(validation["hist_movie_id"]).shape[1],
+        )
+    )
     model = YouTubeDNN(
         feature_dict=checkpoint["feature_dict"],
         embedding_dim=config.EMB_DIM,
+        history_pooling=history_pooling,
+        max_sequence_length=max_sequence_length,
     )
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device).eval()
@@ -96,6 +108,7 @@ def predict_validation(validation, device, batch_size):
         torch.cat(recommendations),
         torch.cat(targets),
         int(checkpoint["epoch"]),
+        history_pooling,
     )
 
 
@@ -119,7 +132,7 @@ def run(output, expected_seq_len, device_name=None, batch_size=512):
         )
 
     device = resolve_device(device_name)
-    recommendations, targets, checkpoint_epoch = predict_validation(
+    recommendations, targets, checkpoint_epoch, history_pooling = predict_validation(
         validation, device, batch_size
     )
     raw_user_counts = reconstruct_raw_user_activity(train)
@@ -143,7 +156,7 @@ def run(output, expected_seq_len, device_name=None, batch_size=512):
             "test_accessed": False,
             "selection_artifact_contains_test": False,
             "history_length": actual_seq_len,
-            "history_pooling": "masked_mean",
+            "history_pooling": history_pooling,
             "movie_history_semantics": "most recent N movies",
             "genre_history_semantics": "most recent N flattened genre tokens",
             "device": str(device),

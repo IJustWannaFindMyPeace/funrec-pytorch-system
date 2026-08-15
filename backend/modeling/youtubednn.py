@@ -17,6 +17,59 @@ class MaskedMeanPooling(nn.Module):
         return summed / counts
 
 
+class PersonalizedPositionAwareAttentionPooling(nn.Module):
+    """Pool history with user-conditioned, position-aware attention."""
+
+    def __init__(
+        self,
+        embedding_dim: int,
+        query_dim: int,
+        max_sequence_length: int,
+    ) -> None:
+        super().__init__()
+        if max_sequence_length <= 0:
+            raise ValueError("max_sequence_length must be positive")
+        self.max_sequence_length = max_sequence_length
+        self.value_projection = nn.Linear(
+            embedding_dim, embedding_dim, bias=False
+        )
+        self.query_projection = nn.Linear(
+            query_dim, embedding_dim, bias=False
+        )
+        self.position_embedding = nn.Embedding(
+            max_sequence_length, embedding_dim
+        )
+        self.score_projection = nn.Linear(embedding_dim, 1, bias=False)
+
+    def forward(
+        self,
+        embeddings: Tensor,
+        ids: Tensor,
+        query: Tensor,
+    ) -> Tensor:
+        sequence_length = embeddings.shape[1]
+        if sequence_length > self.max_sequence_length:
+            raise ValueError(
+                "History is longer than configured max_sequence_length"
+            )
+        positions = torch.arange(
+            sequence_length,
+            device=embeddings.device,
+        )
+        position_embeddings = self.position_embedding(positions)[None, :, :]
+        hidden = torch.tanh(
+            self.value_projection(embeddings)
+            + self.query_projection(query)[:, None, :]
+            + position_embeddings
+        )
+        scores = self.score_projection(hidden).squeeze(-1)
+        mask = ids.ne(0)
+        scores = scores.masked_fill(~mask, -1e9)
+        weights = torch.softmax(scores, dim=1) * mask.to(scores.dtype)
+        weights = weights / weights.sum(dim=1, keepdim=True).clamp_min(1e-12)
+        return (embeddings * weights.unsqueeze(-1)).sum(dim=1)
+
+
 class YouTubeDNN(nn.Module):
     """YouTubeDNN two-tower retrieval model."""
 
@@ -32,11 +85,19 @@ class YouTubeDNN(nn.Module):
         self,
         feature_dict: Dict[str, int],
         embedding_dim: int = 16,
+        history_pooling: str = "masked_mean",
+        max_sequence_length: int = 10,
     ) -> None:
         super().__init__()
 
         self.feature_dict = dict(feature_dict)
         self.embedding_dim = embedding_dim
+        if history_pooling not in {"masked_mean", "personalized_attention"}:
+            raise ValueError(f"Unsupported history_pooling: {history_pooling}")
+        if max_sequence_length <= 0:
+            raise ValueError("max_sequence_length must be positive")
+        self.history_pooling = history_pooling
+        self.max_sequence_length = max_sequence_length
 
         self.user_embeddings = nn.ModuleDict(
             {
@@ -60,7 +121,27 @@ class YouTubeDNN(nn.Module):
             padding_idx=0,
         )
 
-        self.sequence_pooling = MaskedMeanPooling()
+        if history_pooling == "masked_mean":
+            self.sequence_pooling = MaskedMeanPooling()
+            self.movie_attention_pooling = None
+            self.genre_attention_pooling = None
+        else:
+            query_dim = len(self.USER_FEATURES) * embedding_dim
+            self.sequence_pooling = None
+            self.movie_attention_pooling = (
+                PersonalizedPositionAwareAttentionPooling(
+                    embedding_dim,
+                    query_dim,
+                    max_sequence_length,
+                )
+            )
+            self.genre_attention_pooling = (
+                PersonalizedPositionAwareAttentionPooling(
+                    embedding_dim,
+                    query_dim,
+                    max_sequence_length,
+                )
+            )
 
         user_input_dim = (len(self.USER_FEATURES) + 2) * embedding_dim
         self.user_dnn = nn.Sequential(
@@ -89,6 +170,20 @@ class YouTubeDNN(nn.Module):
                 nn.init.xavier_uniform_(module.weight)
                 nn.init.zeros_(module.bias)
 
+        for pooling in (
+            self.movie_attention_pooling,
+            self.genre_attention_pooling,
+        ):
+            if pooling is None:
+                continue
+            nn.init.normal_(pooling.position_embedding.weight, std=0.01)
+            for projection in (
+                pooling.value_projection,
+                pooling.query_projection,
+                pooling.score_projection,
+            ):
+                nn.init.xavier_uniform_(projection.weight)
+
     def encode_user(self, features: Dict[str, Tensor]) -> Tensor:
         static_embeddings = [
             self.user_embeddings[name](features[name].long())
@@ -98,14 +193,27 @@ class YouTubeDNN(nn.Module):
         history_movie_ids = features["hist_movie_id"].long()
         history_genre_ids = features["hist_genres"].long()
 
-        history_movie_embedding = self.sequence_pooling(
-            self.movie_embedding(history_movie_ids),
-            history_movie_ids,
-        )
-        history_genre_embedding = self.sequence_pooling(
-            self.genre_embedding(history_genre_ids),
-            history_genre_ids,
-        )
+        movie_embeddings = self.movie_embedding(history_movie_ids)
+        genre_embeddings = self.genre_embedding(history_genre_ids)
+        if self.history_pooling == "masked_mean":
+            history_movie_embedding = self.sequence_pooling(
+                movie_embeddings, history_movie_ids
+            )
+            history_genre_embedding = self.sequence_pooling(
+                genre_embeddings, history_genre_ids
+            )
+        else:
+            static_query = torch.cat(static_embeddings, dim=-1)
+            history_movie_embedding = self.movie_attention_pooling(
+                movie_embeddings,
+                history_movie_ids,
+                static_query,
+            )
+            history_genre_embedding = self.genre_attention_pooling(
+                genre_embeddings,
+                history_genre_ids,
+                static_query,
+            )
 
         user_input = torch.cat(
             [

@@ -156,6 +156,8 @@ def export_retrieval_artifacts(
         {
             "feature_dict": dict(feature_dict),
             "embedding_dim": model_cpu.embedding_dim,
+            "history_pooling": model_cpu.history_pooling,
+            "max_sequence_length": model_cpu.max_sequence_length,
             "model_state_dict": model_cpu.state_dict(),
         },
         USER_MODEL_PATH,
@@ -205,6 +207,8 @@ def run_retrieval_training(
     max_train_batches: Optional[int] = None,
     max_eval_batches: Optional[int] = None,
     seed: int = 42,
+    history_pooling: str = "masked_mean",
+    max_sequence_length: int = config.MAX_SEQ_LEN,
 ):
     """Run training, validation, checkpointing, and export."""
     if epochs <= 0:
@@ -217,6 +221,10 @@ def run_retrieval_training(
         raise ValueError("patience must be greater than zero")
     if num_workers < 0:
         raise ValueError("num_workers must not be negative")
+    if history_pooling not in {"masked_mean", "personalized_attention"}:
+        raise ValueError("Unsupported history_pooling")
+    if max_sequence_length <= 0:
+        raise ValueError("max_sequence_length must be positive")
 
     set_random_seed(seed)
     device = resolve_device(device_name)
@@ -231,6 +239,14 @@ def run_retrieval_training(
     samples, feature_dict, vocab_dict = (
         load_training_artifacts()
     )
+    actual_sequence_length = int(
+        np.asarray(samples["validation"]["hist_movie_id"]).shape[1]
+    )
+    if actual_sequence_length != max_sequence_length:
+        raise ValueError(
+            f"Configured max_sequence_length={max_sequence_length}, "
+            f"but Validation history length is {actual_sequence_length}"
+        )
     train_loader, validation_loader = build_data_loaders(
         samples=samples,
         batch_size=batch_size,
@@ -241,6 +257,8 @@ def run_retrieval_training(
     model = YouTubeDNN(
         feature_dict=feature_dict,
         embedding_dim=config.EMB_DIM,
+        history_pooling=history_pooling,
+        max_sequence_length=max_sequence_length,
     ).to(device)
 
     optimizer = torch.optim.Adam(
@@ -260,6 +278,18 @@ def run_retrieval_training(
                 f"{LAST_CHECKPOINT_PATH}"
             )
 
+        checkpoint_metadata = torch.load(
+            LAST_CHECKPOINT_PATH,
+            map_location="cpu",
+            weights_only=True,
+        )
+        checkpoint_metrics = checkpoint_metadata.get("metrics", {})
+        if checkpoint_metrics.get("history_pooling", "masked_mean") != history_pooling:
+            raise ValueError("Checkpoint history_pooling does not match")
+        if int(checkpoint_metrics.get(
+            "max_sequence_length", max_sequence_length
+        )) != max_sequence_length:
+            raise ValueError("Checkpoint max_sequence_length does not match")
         checkpoint = load_checkpoint(
             LAST_CHECKPOINT_PATH,
             model,
@@ -295,6 +325,8 @@ def run_retrieval_training(
     print(f"验证样本: {len(validation_loader.dataset)}")
     print(f"Batch size: {batch_size}")
     print(f"目标 epoch: {epochs}")
+    print(f"History pooling: {history_pooling}")
+    print(f"History length: {max_sequence_length}")
 
     for epoch in range(start_epoch, epochs + 1):
         train_stats = train_one_epoch(
@@ -343,6 +375,8 @@ def run_retrieval_training(
             "epochs_without_improvement": (
                 epochs_without_improvement
             ),
+            "history_pooling": history_pooling,
+            "max_sequence_length": max_sequence_length,
         }
 
         save_checkpoint(
@@ -458,6 +492,16 @@ def parse_args():
         type=int,
         default=42,
     )
+    parser.add_argument(
+        "--history-pooling",
+        choices=("masked_mean", "personalized_attention"),
+        default="masked_mean",
+    )
+    parser.add_argument(
+        "--max-sequence-length",
+        type=int,
+        default=config.MAX_SEQ_LEN,
+    )
     return parser.parse_args()
 
 
@@ -475,6 +519,8 @@ def main():
         max_train_batches=args.max_train_batches,
         max_eval_batches=args.max_eval_batches,
         seed=args.seed,
+        history_pooling=args.history_pooling,
+        max_sequence_length=args.max_sequence_length,
     )
 
 
