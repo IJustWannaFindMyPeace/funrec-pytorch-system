@@ -62,9 +62,25 @@ MovieLens 1M 包含 6,040 位用户、3,883 部电影和 1,000,209 条评分。�
 
 Validation AUC=0.866237，Test AUC=0.841382，下降 `0.024855`，即 2.49 个百分点（相对下降约 2.87%）。这表示更晚窗口泛化变弱，但不能单独证明用户兴趣漂移。
 
-## 兴趣漂移与诊断
+## Validation-only 诊断结论
 
-兴趣漂移指用户偏好随时间改变，例如早期偏好喜剧、近期转向科幻。下一阶段严格只在 Validation 上分析历史长度、活跃度、偏好熵、目标热门度、年代、genre、负样本类型、召回命中和精排位置，再据此选择优化。
+诊断代码始终读取 `validation`，并在证据中声明 `test_accessed=false`。V2 发现所有 Retrieval Validation 样本的长度 10 历史窗口均已饱和；这只是模型可见窗口，不是用户原始活跃度。按冻结协议重建的原始活动范围为 20–2,314 次，训练样本还存在明显用户集中：Retrieval/Ranking 中最活跃 10% 用户分别贡献 38.61%/37.83% 的训练样本。
+
+V3 在 Validation 上得到 Retrieval Recall@10=`0.156954`、NDCG@10=`0.077737`；DeepFM ROC-AUC=`0.866237`、PR-AUC=`0.692331`、logloss=`0.417611`。Retrieval 的最低/最高活跃四分位 Recall@10 为 `0.198423/0.105123`；最低/最高目标热门度四分位为 `0.079396/0.192715`。这同时提示活跃用户表示和长尾召回问题，但单轴切片可能混杂。
+
+V4 使用“原始用户活跃度 × Train 电影热门度”4×4 交叉矩阵。固定最热门电影组后，低/高活跃用户 Retrieval Recall@10 为 `0.251969/0.087963`，相对下降 65.1%；NDCG@10 为 `0.1292/0.0454`，相对下降 64.9%。因此活跃度退化不能只由目标电影更冷门解释。不过在最冷门组中该趋势不成立，说明活跃度与热门度存在交互，不能宣称历史截断是唯一原因。
+
+DeepFM 在 16 个交叉格中都优于同格常数正例率预测器，但优势随活跃度上升而普遍缩小。整体 PR-AUC=`0.692331`，其无信息基线为正例率 `0.284850`；归一化 logloss=`0.698959`，即相对常数预测器改善 30.10%。热门度分组正例率差异很大，因此原始 PR-AUC 和 logloss 不能脱离各组基线直接横比。
+
+兴趣漂移指偏好随时间改变，例如早期偏好喜剧、近期转向科幻；多兴趣指同一用户同时存在多个兴趣主题。当前证据只能说明高活跃用户更难建模，不能仅凭分组指标证明发生兴趣漂移。
+
+## 第一次优化：预注册实验协议
+
+第一个方向是 Retrieval 历史表示容量，而非先改 sampled softmax。保持数据切分、标签、embedding 维度、优化器、full softmax 与 checkpoint 选择规则不变，先比较长度 10/20/50 的近期历史平均池化；若增加长度无效，再在最佳长度上比较 recency-weighted pooling 和 attention pooling。
+
+选择只使用 Validation。主要指标为整体 Recall@10；约束指标为最高活跃组 AQ3 Recall@10、AQ3–AQ0 差距、长尾 PQ0 Recall@10 和 NDCG@10。候选必须同时满足：整体 Recall@10 提升、AQ3 提升、活跃度差距缩小，且 PQ0 无明显退化。Test 继续封存。若长度增加只提高训练成本或稀释近期兴趣，则保留长度 10，并把该负结果写入故事。
+
+Sampled softmax主要解决超大类别空间的计算成本；当前只有 3,883 类且 exact softmax 可承受，不能预设它提升质量。固定每用户样本数、长尾重加权和 train–serve 归一化一致性均保留为后续独立消融，避免一次修改多个变量。
 
 ## 代码索引
 
@@ -73,5 +89,7 @@ Validation AUC=0.866237，Test AUC=0.841382，下降 `0.024855`，即 2.49 个�
 - `backend/offline/feature/preprocess_retrieval.py`
 - `backend/offline/feature/preprocess_ranking.py`
 - `backend/offline/evaluation/retrieval.py`
+- `backend/offline/evaluation/diagnose_validation.py`
+- `backend/offline/evaluation/diagnose_validation_models.py`
+- `backend/offline/evaluation/diagnose_validation_cross.py`
 - `docs/results/baseline_v0_*.json`
-
