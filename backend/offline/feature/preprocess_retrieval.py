@@ -5,6 +5,7 @@
 使用滑动窗口方式构建用户历史序列。
 """
 
+import argparse
 import sys
 import pickle
 import numpy as np
@@ -158,6 +159,10 @@ def generate_train_eval_samples(
     generate sliding-window training examples. This prevents either held-out
     split from participating in model fitting or checkpoint selection.
     """
+    if max_hist_seq_len <= 0:
+        raise ValueError("max_hist_seq_len must be greater than zero")
+    if max_feat_seq_len <= 0:
+        raise ValueError("max_feat_seq_len must be greater than zero")
     data_df = data_df.sort_values(
         ["timestamp", "_source_row"],
         kind="stable",
@@ -238,8 +243,13 @@ def generate_train_eval_samples(
         "test": to_numpy(test_data_dict),
     }
 
-def run_retrieval_preprocessing():
+def run_retrieval_preprocessing(
+    max_seq_len=config.MAX_SEQ_LEN,
+    selection_only=False,
+):
     """召回模型预处理主流程"""
+    if max_seq_len <= 0:
+        raise ValueError("max_seq_len must be greater than zero")
     # 1. 加载数据
     df_movies, df_ratings, df_users = load_raw_data()
     
@@ -250,12 +260,35 @@ def run_retrieval_preprocessing():
     user_columns = ["gender", "age", "occupation", "zip_code"]
     item_columns = ["movie_id", "genres", "isAdult", "startYear"]
     samples  = generate_train_eval_samples(
-        df_merged, user_columns, item_columns, max_hist_seq_len=config.MAX_SEQ_LEN, max_feat_seq_len=config.MAX_SEQ_LEN
+        df_merged,
+        user_columns,
+        item_columns,
+        max_hist_seq_len=max_seq_len,
+        max_feat_seq_len=max_seq_len,
     )
 
     # 4. 保存
     print("保存处理后的数据...")
-    pickle.dump(samples, open(config.TRAIN_DATA_PATH, "wb"))
+    if selection_only:
+        selection_samples = {
+            "train": samples["train"],
+            "validation": samples["validation"],
+        }
+        sealed_test_path = (
+            config.TEMP_DIR / "retrieval_test_sealed.pkl"
+        )
+        pickle.dump(
+            selection_samples,
+            open(config.TRAIN_DATA_PATH, "wb"),
+        )
+        pickle.dump(
+            {"test": samples["test"]},
+            open(sealed_test_path, "wb"),
+        )
+        print(f"Selection-only 工件: {config.TRAIN_DATA_PATH}")
+        print(f"封存 Test 工件: {sealed_test_path}")
+    else:
+        pickle.dump(samples, open(config.TRAIN_DATA_PATH, "wb"))
     
     vocab_dict = {**user_vocab, **movie_vocab}
     pickle.dump(vocab_dict, open(config.VOCAB_DICT_PATH, "wb"))
@@ -267,5 +300,29 @@ def run_retrieval_preprocessing():
     print("预处理完成.")
     return df_users_processed, df_movies_processed
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Preprocess chronological retrieval samples"
+    )
+    parser.add_argument(
+        "--max-seq-len",
+        type=int,
+        default=config.MAX_SEQ_LEN,
+    )
+    parser.add_argument(
+        "--selection-only",
+        action="store_true",
+        help=(
+            "Keep Train/Validation in the training artifact and seal Test "
+            "in a separate file."
+        ),
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    run_retrieval_preprocessing()
+    args = parse_args()
+    run_retrieval_preprocessing(
+        max_seq_len=args.max_seq_len,
+        selection_only=args.selection_only,
+    )
