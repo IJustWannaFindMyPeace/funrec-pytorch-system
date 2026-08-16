@@ -17,6 +17,7 @@
 | V2-ITEMCF-001 | rejected | cbf4949 | 不适用 | Train-only recent-100 ItemCF，固定 25/25 候选融合 | ItemCF 有 390 个双塔@50 独特命中，但 union Recall@50=0.441391 < 0.450331 | 未访问 | 通道互补成立，固定 top-50 替换不成立；不部署、不调配额 |
 | V2-RANKING-001 | rejected | 6b7b37b | 42 | Test-safe ranking selection baseline | Validation AUC=0.864214（Epoch 5） | 未访问 | 预注册写 loss、代码实际按 AUC 选 checkpoint；协议无效，保留但不使用 |
 | V2-RANKING-002 | completed | 0e9cffb | 42 | Test-safe ranking baseline，Validation AUC 选 checkpoint | Validation AUC=0.864214（Epoch 5） | 未访问 | 有效 V2 ranking 校准锚点；需先补 Validation-only evaluator 再评候选池 |
+| V2-E2E-ITEMCF-001 | rejected | 6fd9658 | 不适用 | 双塔 Top-50 加 ItemCF 独特候选，经固定 DeepFM 重排 | Recall@10=0.062422 < 0.111306；Tail=0.007203 < 0.022809 | 未访问 | 召回互补未转化为排序收益；候选池扩容与 ranker 训练分布失配 |
 
 ## EXP-000 事实记录
 

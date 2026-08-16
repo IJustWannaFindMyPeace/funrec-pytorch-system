@@ -1,0 +1,8 @@
+{
+  "experiment": "v2-itemcf-deepfm-candidate-pool",
+  "status": "validation_rejected",
+  "preregistration": "docs/results/v2_itemcf_deepfm_candidate_pool_preregistered_config.json",
+  "protocol": {"split": "validation", "common_cohort": 3989, "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false, "baseline_pool": "two_tower_top50", "candidate_pool": "two_tower_top50 plus ItemCF unique candidates, cap=100", "ranker": "fixed V2 DeepFM"},
+  "metrics": {"baseline_recall_at_10": 0.1113060936331749, "candidate_recall_at_10": 0.062421660870313644, "baseline_ndcg_at_10": 0.04994527995586395, "candidate_ndcg_at_10": 0.027759235352277756, "baseline_tail_pq0_recall_at_10": 0.022809123620390892, "candidate_tail_pq0_recall_at_10": 0.007202880922704935},
+  "decision": "Rejected. Candidate-pool expansion misses all frozen improvements and materially harms overall and tail ranking. Do not tune pool cap or deploy. The evidence supports a new causal hypothesis: ranking negative-sample distribution is misaligned with serving candidate pools."
+}
