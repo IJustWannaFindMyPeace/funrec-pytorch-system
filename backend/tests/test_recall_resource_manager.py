@@ -3,7 +3,10 @@ import pickle
 import numpy as np
 import torch
 
-from modeling.youtubednn import YouTubeDNN
+from modeling.youtubednn import (
+    SCORING_CONTRACT_SCALED_COSINE_V2,
+    YouTubeDNN,
+)
 from online.recall.resource_manager import RecallResourceManager
 
 
@@ -156,4 +159,23 @@ def test_resource_manager_reports_missing_artifacts(
     assert manager.user_model is None
     assert manager.item_embedding_matrix is None
 
+    reset_resource_manager()
+
+
+def test_resource_manager_rejects_v2_artifacts_without_manifest(
+    tmp_path,
+    monkeypatch,
+):
+    deploy_dir, _ = build_deployed_artifacts(tmp_path)
+    model_path = deploy_dir / "recall" / "retrieval_user_model.pt"
+    artifact = torch.load(model_path, map_location="cpu", weights_only=True)
+    artifact["scoring_contract"] = SCORING_CONTRACT_SCALED_COSINE_V2
+    artifact["logit_scale"] = 10.0
+    torch.save(artifact, model_path)
+
+    monkeypatch.setenv("MODEL_DEPLOY_DIR", str(deploy_dir))
+    monkeypatch.setenv("RECALL_DEVICE", "cpu")
+    reset_resource_manager()
+
+    assert RecallResourceManager()._ensure_resources_loaded() is False
     reset_resource_manager()

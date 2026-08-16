@@ -42,6 +42,7 @@ class Config:
     VOCAB_DICT_PATH = TEMP_DIR / "vocab_dict.pkl"
     ITEM_EMB_PATH = TEMP_DIR / "item_embeddings.npy"
     MOVIE_IDS_PATH = TEMP_DIR / "movie_ids.npy"
+    RETRIEVAL_MANIFEST_PATH = SAVED_MODELS_DIR / "retrieval_manifest.json"
     
     # 文件路径 - 精排模型 (DeepFM)
     RANKING_TRAIN_DATA_PATH = TEMP_DIR / "ranking_train_eval_sample.pkl"

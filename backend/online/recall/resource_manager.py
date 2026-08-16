@@ -1,6 +1,8 @@
 """PyTorch retrieval resource manager for online recall."""
 
 import logging
+import hashlib
+import json
 import os
 import pickle
 from pathlib import Path
@@ -16,6 +18,14 @@ from modeling.youtubednn import YouTubeDNN
 
 
 logger = logging.getLogger(__name__)
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 class RecallResourceManager:
@@ -58,6 +68,8 @@ class RecallResourceManager:
         self.item_embeddings = None
         self.item_embedding_matrix = None
         self.item_embedding_tensor = None
+        self.scoring_contract = None
+        self.logit_scale = None
         self.movie_genre_map = {}
 
         self._resources_loaded = False
@@ -88,6 +100,7 @@ class RecallResourceManager:
         embedding_path = self.recall_dir / "item_embeddings.npy"
         movie_ids_path = self.recall_dir / "movie_ids.npy"
         model_path = self.recall_dir / "retrieval_user_model.pt"
+        manifest_path = self.recall_dir / "retrieval_manifest.json"
 
         required_paths = (
             vocab_path,
@@ -133,6 +146,40 @@ class RecallResourceManager:
 
             feature_dict = artifact["feature_dict"]
             embedding_dim = int(artifact["embedding_dim"])
+            history_pooling = artifact.get(
+                "history_pooling", "masked_mean"
+            )
+            max_sequence_length = int(
+                artifact.get("max_sequence_length", 10)
+            )
+            recent_history_length = int(
+                artifact.get("recent_history_length", 5)
+            )
+            scoring_contract = artifact.get(
+                "scoring_contract", "legacy_raw_item_v1"
+            )
+            logit_scale = float(artifact.get("logit_scale", 1.0))
+
+            if scoring_contract == "scaled_cosine_v2" and not manifest_path.is_file():
+                raise ValueError(
+                    "scaled_cosine_v2 requires retrieval_manifest.json"
+                )
+            if manifest_path.is_file():
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                expected_files = manifest.get("files", {})
+                actual_paths = {
+                    "vocab_dict.pkl": vocab_path,
+                    "item_embeddings.npy": embedding_path,
+                    "movie_ids.npy": movie_ids_path,
+                    "retrieval_user_model.pt": model_path,
+                }
+                if manifest.get("scoring_contract") != scoring_contract:
+                    raise ValueError("retrieval manifest scoring contract mismatch")
+                if float(manifest.get("logit_scale")) != logit_scale:
+                    raise ValueError("retrieval manifest logit scale mismatch")
+                for name, path in actual_paths.items():
+                    if expected_files.get(name) != file_sha256(path):
+                        raise ValueError(f"retrieval artifact hash mismatch: {name}")
 
             if item_embeddings.ndim != 2:
                 raise ValueError(
@@ -148,6 +195,13 @@ class RecallResourceManager:
                 raise ValueError(
                     "item embedding dimension does not match model"
                 )
+
+            if scoring_contract == "scaled_cosine_v2":
+                norms = np.linalg.norm(item_embeddings, axis=1)
+                if not np.allclose(norms, 1.0, atol=1e-5):
+                    raise ValueError(
+                        "scaled_cosine_v2 requires normalized item embeddings"
+                    )
 
             expected_item_count = feature_dict["movie_id"] - 1
             if len(item_embeddings) != expected_item_count:
@@ -169,6 +223,11 @@ class RecallResourceManager:
             model = YouTubeDNN(
                 feature_dict=feature_dict,
                 embedding_dim=embedding_dim,
+                history_pooling=history_pooling,
+                max_sequence_length=max_sequence_length,
+                recent_history_length=recent_history_length,
+                scoring_contract=scoring_contract,
+                logit_scale=logit_scale,
             )
             model.load_state_dict(artifact["model_state_dict"])
             model.to(self.device)
@@ -191,6 +250,8 @@ class RecallResourceManager:
                 padded_embeddings
             ).to(self.device)
             self.user_model = model
+            self.scoring_contract = scoring_contract
+            self.logit_scale = logit_scale
 
             logger.info(
                 "PyTorch 召回资源加载完成，设备=%s，物品向量形状=%s",
@@ -207,6 +268,8 @@ class RecallResourceManager:
             self.item_embeddings = None
             self.item_embedding_matrix = None
             self.item_embedding_tensor = None
+            self.scoring_contract = None
+            self.logit_scale = None
             return False
 
     def encode_feature(

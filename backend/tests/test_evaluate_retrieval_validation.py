@@ -3,6 +3,7 @@ import pytest
 import torch
 
 from modeling.youtubednn import YouTubeDNN
+from modeling.youtubednn import SCORING_CONTRACT_SCALED_COSINE_V2
 
 from offline.evaluation.evaluate_retrieval_validation import (
     infer_sequence_length,
@@ -73,3 +74,32 @@ def test_training_raw_item_scoring_matches_full_softmax_columns():
     assert torch.equal(raw, model.movie_embedding.weight[1:])
     assert torch.allclose(torch.linalg.vector_norm(normalized, dim=1), torch.ones(4))
     assert not torch.allclose(raw, normalized)
+
+
+def test_scaled_cosine_training_logits_match_exported_item_scores():
+    model = YouTubeDNN(
+        FEATURE_DICT,
+        embedding_dim=4,
+        scoring_contract=SCORING_CONTRACT_SCALED_COSINE_V2,
+        logit_scale=7.0,
+    )
+    features = {
+        "user_id": torch.tensor([1, 2]),
+        "age": torch.tensor([1, 1]),
+        "gender": torch.tensor([1, 1]),
+        "occupation": torch.tensor([1, 1]),
+        "zip_code": torch.tensor([1, 1]),
+        "hist_movie_id": torch.tensor([[1, 2, 0], [2, 3, 4]]),
+        "hist_genres": torch.tensor([[1, 2, 0], [2, 3, 1]]),
+    }
+    exported_items = item_embeddings_for_scoring(
+        model, "exported_normalized"
+    )
+
+    assert torch.allclose(
+        model.compute_full_logits(features),
+        model.score_user_to_item_embeddings(
+            model.encode_user(features), exported_items
+        ),
+        atol=1e-6,
+    )
