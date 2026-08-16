@@ -1,0 +1,37 @@
+{
+  "experiment": "v2-candidate-aware-ranking-seed42",
+  "status": "pretraining_audited",
+  "git_commit": "bb19340eb28c851c7043fa80fe1657f16cfdb7ca",
+  "preregistered_config_sha256": "43B2F01222EC9535EAA808166E92392CAE6C18CE4F2D742A0275CD18B7B74F48",
+  "artifact_root": "C:\\Users\\75469\\Data\\funrec-experiments\\v2-candidate-aware-ranking-seed42-optimized\\web_project",
+  "selection_boundary": {
+    "artifact_top_level_keys": ["train", "validation"],
+    "test_accessed": false,
+    "test_deserialized": false,
+    "test_re_evaluated": false
+  },
+  "sample_audit": {
+    "train_rows": 3073809,
+    "train_positive_rows": 696736,
+    "validation_rows": 14014,
+    "validation_positive_rows": 3989,
+    "candidate_aware_negative_rows_added": 695153,
+    "positive_rows_without_eligible_fixed_top50_candidate": 1583
+  },
+  "artifact_sha256": {
+    "ranking_train_eval_sample.pkl": "94F9117D01125E349652C093B2F1259A277CFA3514753DBB63BABFA055617EB0",
+    "ranking_feature_dict.pkl": "0E222A8058C123AA29D397D0212A45BDA354DC77B25D9EE43434B46EAD14CF85",
+    "ranking_vocab_dict.pkl": "0DE410C88F94F30B8CB249B3092A07DC979BC24567D5628B9149825FD6F56D9B"
+  },
+  "planned_training": {
+    "command": "python -m offline.training.train_ranking --epochs 30 --batch-size 128 --learning-rate 0.001 --patience 3 --seed 42 --device cuda --num-workers 0",
+    "resume": false,
+    "checkpoint_selection_metric": "validation_auc_maximize",
+    "output_policy": "new external artifact root only; no existing checkpoints, logs, models, or results are overwritten"
+  },
+  "resource_audit": {
+    "gpu": "NVIDIA GeForce RTX 5070",
+    "gpu_memory_total_mib": 12227,
+    "gpu_memory_free_mib": 9921
+  }
+}
