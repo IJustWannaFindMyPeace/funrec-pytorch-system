@@ -47,12 +47,13 @@
 
 ## ATTENTION-20（正式预注册）
 
-- 状态：`preregistered`；尚未创建正式训练工件或启动训练。
+- 状态：`validation_rejected`；正式训练与 Validation-only 评估已完成。
 - 代码节点：`18dc8639203b77f2a4dc1db9976ad4c1ae33646e`；seed：42。
 - 唯一核心变量：History-20 的 `personalized_attention`，相对于已拒绝的 History-20 `masked_mean`；其余训练协议固定不变。
-- 完整配置与五项 Validation 准入门槛：`docs/results/attention20_preregistered_config.json`。
+- 完整配置与五项 Validation 准入门槛：`docs/results/attention20_preregistered_config.json`；结果证据：`docs/results/attention20_validation_results.json`。
 - 选择边界：仅 Validation；封存 Test 禁止访问、反序列化和重新评估。
-- 后续状态转换：完成目录和命令审计并获得用户确认后，才可启动正式 GPU 训练；结果无论通过或拒绝均须登记。
+- 训练：Epoch 1 后因执行环境时限中断；从 checkpoint 无覆盖恢复，Epoch 23 因 patience=3 早停，按 Validation loss 选择 Epoch 20。
+- 决策：Overall Recall@10=0.199007、NDCG@10=0.101495、AQ3 Recall@10=0.139721、Tail PQ0 Recall@10=0.120735 均通过；AQ0-AQ3 gap=0.120463 超过冻结上限 0.088300。仅通过 4/5，拒绝；Test 保持关闭。
 
 ## 单次实验必须保存
 

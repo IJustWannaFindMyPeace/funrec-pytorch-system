@@ -1,0 +1,73 @@
+{
+  "experiment": "baseline-v1-attention20",
+  "status": "validation_rejected",
+  "git_commit": "6ece6a89f0555dae8c60622e26454bf3fbecc6f7",
+  "protocol": {
+    "split": "validation",
+    "test_accessed": false,
+    "test_deserialized": false,
+    "test_re_evaluated": false,
+    "selection_artifact_contains_test": false
+  },
+  "candidate": {
+    "history_length": 20,
+    "history_pooling": "personalized_attention",
+    "checkpoint_epoch": 20,
+    "checkpoint_selection_metric": "validation_loss",
+    "best_validation_loss": 6.037335856860836,
+    "training_epochs_completed": 23,
+    "early_stopping_patience": 3,
+    "stop_reason": "epochs 21-23 did not improve on the epoch-20 validation loss"
+  },
+  "run_events": [
+    {
+      "event": "tool_session_timeout",
+      "after_epoch": 1,
+      "effect": "The foreground command was terminated by the execution environment after Epoch 1."
+    },
+    {
+      "event": "resumed_training",
+      "from_epoch": 1,
+      "effect": "Training resumed from the saved checkpoint without resetting the run or overwriting its directory."
+    }
+  ],
+  "validation_metrics": {
+    "overall_recall_at_10": 0.19900661706924438,
+    "overall_ndcg_at_10": 0.10149525105953217,
+    "aq0_recall_at_10": 0.2601839601993561,
+    "aq3_recall_at_10": 0.13972055912017822,
+    "aq0_minus_aq3_recall_at_10_gap": 0.12046340107917786,
+    "tail_pq0_recall_at_10": 0.12073490768671036
+  },
+  "frozen_acceptance_check": {
+    "overall_recall_at_10": {
+      "actual": 0.19900661706924438,
+      "minimum": 0.1619536477,
+      "passed": true
+    },
+    "overall_ndcg_at_10": {
+      "actual": 0.10149525105953217,
+      "minimum": 0.0727365714,
+      "passed": true
+    },
+    "aq3_recall_at_10": {
+      "actual": 0.13972055912017822,
+      "minimum": 0.1101230878,
+      "passed": true
+    },
+    "aq0_minus_aq3_recall_at_10_gap": {
+      "actual": 0.12046340107917786,
+      "maximum": 0.0883000445,
+      "passed": false
+    },
+    "tail_pq0_recall_at_10": {
+      "actual": 0.12073490768671036,
+      "minimum": 0.0693963224,
+      "passed": true
+    },
+    "passed_count": 4,
+    "required_count": 5,
+    "decision": "validation_rejected"
+  },
+  "conclusion": "The candidate improves overall, AQ3, and tail retrieval metrics but widens the AQ0-AQ3 recall gap beyond the frozen limit. It is rejected under the preregistered all-five-pass rule; Test remains sealed."
+}
