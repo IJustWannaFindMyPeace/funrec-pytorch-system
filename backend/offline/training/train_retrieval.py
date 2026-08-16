@@ -14,6 +14,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 
 from modeling.youtubednn import (
+    MINDYouTubeDNN,
     SCORING_CONTRACT_LEGACY_RAW_ITEM,
     SUPPORTED_SCORING_CONTRACTS,
     YouTubeDNN,
@@ -276,6 +277,7 @@ def run_retrieval_training(
     loss_weighting: str = "uniform",
     scoring_contract: str = SCORING_CONTRACT_LEGACY_RAW_ITEM,
     logit_scale: float = 1.0,
+    model_type: str = "youtube_dnn",
 ):
     """Run training, validation, checkpointing, and export."""
     if epochs <= 0:
@@ -300,6 +302,8 @@ def run_retrieval_training(
         raise ValueError("Unsupported scoring_contract")
     if logit_scale <= 0:
         raise ValueError("logit_scale must be positive")
+    if model_type not in {"youtube_dnn", "mind_k2"}:
+        raise ValueError("Unsupported model_type")
 
     set_random_seed(seed)
     device = resolve_device(device_name)
@@ -332,7 +336,8 @@ def run_retrieval_training(
     if loss_weighting == "activity_balanced":
         user_loss_weights = build_activity_balanced_user_weights(samples["train"]).to(device)
 
-    model = YouTubeDNN(
+    model_class = MINDYouTubeDNN if model_type == "mind_k2" else YouTubeDNN
+    model = model_class(
         feature_dict=feature_dict,
         embedding_dim=config.EMB_DIM,
         history_pooling=history_pooling,
@@ -600,6 +605,7 @@ def parse_args():
         default=SCORING_CONTRACT_LEGACY_RAW_ITEM,
     )
     parser.add_argument("--logit-scale", type=float, default=1.0)
+    parser.add_argument("--model-type", choices=("youtube_dnn", "mind_k2"), default="youtube_dnn")
     return parser.parse_args()
 
 
@@ -623,6 +629,7 @@ def main():
         loss_weighting=args.loss_weighting,
         scoring_contract=args.scoring_contract,
         logit_scale=args.logit_scale,
+        model_type=args.model_type,
     )
 
 
