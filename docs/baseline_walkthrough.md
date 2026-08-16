@@ -78,6 +78,26 @@ DeepFM 在 16 个交叉格中都优于同格常数正例率预测器，但优势
 
 第一个方向是 Retrieval 历史表示容量，而非先改 sampled softmax。保持数据切分、标签、embedding 维度、优化器、full softmax 与 checkpoint 选择规则不变，先比较长度 10/20/50 的近期历史平均池化；若增加长度无效，再在最佳长度上比较 recency-weighted pooling 和 attention pooling。
 
+## Validation 驱动的 History-20 迭代
+
+Baseline 的 Validation 切片显示高活跃 AQ3 与长尾 PQ0 是弱点；这只是诊断相关性，不足以直接断言兴趣漂移。History-20 + `masked_mean` 的正式对照只通过 5 项预注册门槛中的 1 项（Recall@10=`0.143543`、NDCG@10=`0.072490`），因此记录为 `validation_rejected`，没有打开 Test。
+
+同一 checkpoint 的历史遮罩结果也不支持“旧历史只是简单等权稀释近期兴趣”：full-20、recent-10-only、older-10-only 的 Recall@10 分别为 `0.143543`、`0.122682`、`0.071192`，只满足 4 项判据中的 1 项。下一候选因而只改变聚合表达能力：History-20 + personalized position-aware attention；其余训练协议保持不变。
+
+## Attention-20 正式结果：拒绝但保留
+
+正式 Attention-20 在预注册的 30 epoch 上限、patience=3、seed=42 下训练至 Epoch 23；最佳 Validation-loss checkpoint 为 Epoch 20（loss=`6.037336`）。评估严格只使用 Validation，且 Test 访问、反序列化、重新评估均为 false。
+
+| 冻结门槛 | 实际值 | 结论 |
+|---|---:|---|
+| Overall Recall@10 ≥ 0.161954 | 0.199007 | 通过 |
+| Overall NDCG@10 ≥ 0.072737 | 0.101495 | 通过 |
+| AQ3 Recall@10 ≥ 0.110123 | 0.139721 | 通过 |
+| AQ0−AQ3 gap ≤ 0.088300 | 0.120463 | 未通过 |
+| Tail PQ0 Recall@10 ≥ 0.069396 | 0.120735 | 通过 |
+
+候选通过 4/5 项，却因活跃度 gap 超过预注册上限而被判定为 `validation_rejected`。这不是“Attention 无效”的结论：它改善了整体、AQ3 与长尾指标，但没有满足本项目对活跃度公平性的联合准入标准。门槛不因该结果修改，Test 继续封存。完整预注册与结果分别见 `docs/results/attention20_preregistered_config.json` 和 `docs/results/attention20_validation_results.json`。
+
 选择只使用 Validation。主要指标为整体 Recall@10；约束指标为最高活跃组 AQ3 Recall@10、AQ3–AQ0 差距、长尾 PQ0 Recall@10 和 NDCG@10。候选必须同时满足：整体 Recall@10 提升、AQ3 提升、活跃度差距缩小，且 PQ0 无明显退化。Test 继续封存。若长度增加只提高训练成本或稀释近期兴趣，则保留长度 10，并把该负结果写入故事。
 
 Sampled softmax主要解决超大类别空间的计算成本；当前只有 3,883 类且 exact softmax 可承受，不能预设它提升质量。固定每用户样本数、长尾重加权和 train–serve 归一化一致性均保留为后续独立消融，避免一次修改多个变量。

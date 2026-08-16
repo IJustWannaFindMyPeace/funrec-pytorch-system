@@ -35,10 +35,19 @@
 - 在线矩阵多出的第 0 行是适配一基电影 ID 的全零 padding/OOV 向量，不改变真实电影数量和模型工件。
 - `EXP-000` 已形成可追溯的离线评估—部署复制—容器挂载—在线推理闭环。
 
+### Validation 诊断与受控迭代
+
+- Validation 分群确认高活跃 AQ3 与长尾 PQ0 是 Retrieval 弱点；没有把这种相关性直接宣传为兴趣漂移因果。
+- History-20 + masked mean 只通过 1/5 个预注册门槛，被拒绝；同 checkpoint 的遮罩诊断也不支持“旧历史简单等权稀释近期兴趣”。
+- 唯一改变聚合机制的正式 Attention-20 在 Epoch 23 按 patience=3 早停，选择 Epoch 20 的最低 Validation loss checkpoint。
+- Attention-20 的 Recall@10=`0.199007`、NDCG@10=`0.101495`、AQ3 Recall@10=`0.139721`、Tail PQ0 Recall@10=`0.120735` 均越过冻结门槛；但 AQ0−AQ3 gap=`0.120463` 超过上限 `0.088300`。
+- 因此按全五项通过规则记录为 `validation_rejected`。Test 始终未访问；失败结果和一次工具会话超时后的无覆盖恢复均已保留。
+
 ## 尚未完成
-- Validation 用户/物品/漏斗分群诊断。
-- 由诊断证据选择第一个算法优化，而非预设 Hard Negative、Attention 或新模型。
-- 最终候选方案的多随机种子复验与端到端精度—延迟权衡。
+
+- 在不改变既有门槛且不打开 Test 的前提下，提出并预注册下一项单变量候选。
+- 仅对未来满足全部 Validation 准入门槛的候选开展多随机种子复验与端到端精度—延迟权衡。
+- 生成、渲染并逐页检查真实面试 PPTX；其中必须把 Attention-20 标为失败的 Validation 候选，而不是成功指标。
 
 ## 面试叙事主线
 
