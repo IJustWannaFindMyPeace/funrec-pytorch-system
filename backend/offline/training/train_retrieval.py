@@ -158,6 +158,7 @@ def export_retrieval_artifacts(
             "embedding_dim": model_cpu.embedding_dim,
             "history_pooling": model_cpu.history_pooling,
             "max_sequence_length": model_cpu.max_sequence_length,
+            "recent_history_length": model_cpu.recent_history_length,
             "model_state_dict": model_cpu.state_dict(),
         },
         USER_MODEL_PATH,
@@ -209,6 +210,7 @@ def run_retrieval_training(
     seed: int = 42,
     history_pooling: str = "masked_mean",
     max_sequence_length: int = config.MAX_SEQ_LEN,
+    recent_history_length: int = 5,
 ):
     """Run training, validation, checkpointing, and export."""
     if epochs <= 0:
@@ -221,10 +223,12 @@ def run_retrieval_training(
         raise ValueError("patience must be greater than zero")
     if num_workers < 0:
         raise ValueError("num_workers must not be negative")
-    if history_pooling not in {"masked_mean", "personalized_attention"}:
+    if history_pooling not in {"masked_mean", "personalized_attention", "dual_timescale_attention"}:
         raise ValueError("Unsupported history_pooling")
     if max_sequence_length <= 0:
         raise ValueError("max_sequence_length must be positive")
+    if history_pooling == "dual_timescale_attention" and not 0 < recent_history_length < max_sequence_length:
+        raise ValueError("recent_history_length must be within max_sequence_length")
 
     set_random_seed(seed)
     device = resolve_device(device_name)
@@ -259,6 +263,7 @@ def run_retrieval_training(
         embedding_dim=config.EMB_DIM,
         history_pooling=history_pooling,
         max_sequence_length=max_sequence_length,
+        recent_history_length=recent_history_length,
     ).to(device)
 
     optimizer = torch.optim.Adam(
@@ -377,6 +382,7 @@ def run_retrieval_training(
             ),
             "history_pooling": history_pooling,
             "max_sequence_length": max_sequence_length,
+            "recent_history_length": recent_history_length,
         }
 
         save_checkpoint(
@@ -494,7 +500,7 @@ def parse_args():
     )
     parser.add_argument(
         "--history-pooling",
-        choices=("masked_mean", "personalized_attention"),
+        choices=("masked_mean", "personalized_attention", "dual_timescale_attention"),
         default="masked_mean",
     )
     parser.add_argument(
@@ -502,6 +508,7 @@ def parse_args():
         type=int,
         default=config.MAX_SEQ_LEN,
     )
+    parser.add_argument("--recent-history-length", type=int, default=5)
     return parser.parse_args()
 
 
@@ -521,6 +528,7 @@ def main():
         seed=args.seed,
         history_pooling=args.history_pooling,
         max_sequence_length=args.max_sequence_length,
+        recent_history_length=args.recent_history_length,
     )
 
 

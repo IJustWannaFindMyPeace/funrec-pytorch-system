@@ -79,6 +79,35 @@ class PersonalizedPositionAwareAttentionPooling(nn.Module):
         return (embeddings * weights.unsqueeze(-1)).sum(dim=1)
 
 
+class DualTimescaleAttentionPooling(nn.Module):
+    """Fuse separate recent and older personalized-attention summaries."""
+
+    def __init__(self, embedding_dim, query_dim, max_sequence_length, recent_length):
+        super().__init__()
+        if not 0 < recent_length < max_sequence_length:
+            raise ValueError("recent_length must be within the history window")
+        self.recent_length = recent_length
+        self.older_attention = PersonalizedPositionAwareAttentionPooling(
+            embedding_dim, query_dim, max_sequence_length
+        )
+        self.recent_attention = PersonalizedPositionAwareAttentionPooling(
+            embedding_dim, query_dim, max_sequence_length
+        )
+        self.fusion_gate = nn.Linear(query_dim, 1)
+
+    def forward(self, embeddings, ids, query):
+        older_ids, recent_ids = ids.clone(), ids.clone()
+        older_ids[:, -self.recent_length:] = 0
+        recent_ids[:, :-self.recent_length] = 0
+        older = self.older_attention(embeddings, older_ids, query)
+        recent = self.recent_attention(embeddings, recent_ids, query)
+        available = torch.stack([older_ids.ne(0).any(1), recent_ids.ne(0).any(1)], 1)
+        raw = torch.stack([1.0 - torch.sigmoid(self.fusion_gate(query)).squeeze(1), torch.sigmoid(self.fusion_gate(query)).squeeze(1)], 1)
+        raw = raw * available.to(raw.dtype)
+        weights = raw / raw.sum(1, keepdim=True).clamp_min(1e-12)
+        return older * weights[:, :1] + recent * weights[:, 1:]
+
+
 class YouTubeDNN(nn.Module):
     """YouTubeDNN two-tower retrieval model."""
 
@@ -96,17 +125,19 @@ class YouTubeDNN(nn.Module):
         embedding_dim: int = 16,
         history_pooling: str = "masked_mean",
         max_sequence_length: int = 10,
+        recent_history_length: int = 5,
     ) -> None:
         super().__init__()
 
         self.feature_dict = dict(feature_dict)
         self.embedding_dim = embedding_dim
-        if history_pooling not in {"masked_mean", "personalized_attention"}:
+        if history_pooling not in {"masked_mean", "personalized_attention", "dual_timescale_attention"}:
             raise ValueError(f"Unsupported history_pooling: {history_pooling}")
         if max_sequence_length <= 0:
             raise ValueError("max_sequence_length must be positive")
         self.history_pooling = history_pooling
         self.max_sequence_length = max_sequence_length
+        self.recent_history_length = recent_history_length
 
         self.user_embeddings = nn.ModuleDict(
             {
@@ -134,7 +165,7 @@ class YouTubeDNN(nn.Module):
             self.sequence_pooling = MaskedMeanPooling()
             self.movie_attention_pooling = None
             self.genre_attention_pooling = None
-        else:
+        elif history_pooling == "personalized_attention":
             query_dim = len(self.USER_FEATURES) * embedding_dim
             self.sequence_pooling = None
             self.movie_attention_pooling = (
@@ -151,6 +182,11 @@ class YouTubeDNN(nn.Module):
                     max_sequence_length,
                 )
             )
+        else:
+            query_dim = len(self.USER_FEATURES) * embedding_dim
+            self.sequence_pooling = None
+            self.movie_attention_pooling = DualTimescaleAttentionPooling(embedding_dim, query_dim, max_sequence_length, recent_history_length)
+            self.genre_attention_pooling = DualTimescaleAttentionPooling(embedding_dim, query_dim, max_sequence_length, recent_history_length)
 
         user_input_dim = (len(self.USER_FEATURES) + 2) * embedding_dim
         self.user_dnn = nn.Sequential(
@@ -184,6 +220,13 @@ class YouTubeDNN(nn.Module):
             self.genre_attention_pooling,
         ):
             if pooling is None:
+                continue
+            if isinstance(pooling, DualTimescaleAttentionPooling):
+                for attention in (pooling.older_attention, pooling.recent_attention):
+                    nn.init.normal_(attention.position_embedding.weight, std=0.01)
+                    for projection in (attention.value_projection, attention.query_projection, attention.score_projection):
+                        nn.init.xavier_uniform_(projection.weight)
+                nn.init.xavier_uniform_(pooling.fusion_gate.weight); nn.init.zeros_(pooling.fusion_gate.bias)
                 continue
             nn.init.normal_(pooling.position_embedding.weight, std=0.01)
             for projection in (

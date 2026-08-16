@@ -40,6 +40,20 @@ def test_attention_encoder_returns_finite_normalized_users():
         history_pooling="personalized_attention",
         max_sequence_length=4,
     )
+
+
+def test_dual_timescale_attention_encoder_is_finite_and_normalized():
+    model = YouTubeDNN(
+        feature_dict(),
+        embedding_dim=4,
+        history_pooling="dual_timescale_attention",
+        max_sequence_length=4,
+        recent_history_length=2,
+    )
+    users = model.encode_user(features())
+    assert users.shape == (2, 4)
+    assert torch.isfinite(users).all()
+    assert torch.allclose(torch.linalg.vector_norm(users, dim=1), torch.ones(2), atol=1e-6)
     users = model.encode_user(features())
     assert users.shape == (2, 4)
     assert torch.isfinite(users).all()

@@ -73,11 +73,13 @@ def predict_validation(validation, device, batch_size):
             np.asarray(validation["hist_movie_id"]).shape[1],
         )
     )
+    recent_history_length = int(checkpoint_metrics.get("recent_history_length", 5))
     model = YouTubeDNN(
         feature_dict=checkpoint["feature_dict"],
         embedding_dim=config.EMB_DIM,
         history_pooling=history_pooling,
         max_sequence_length=max_sequence_length,
+        recent_history_length=recent_history_length,
     )
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device).eval()
