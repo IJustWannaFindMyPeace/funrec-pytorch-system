@@ -42,7 +42,12 @@ def run_validation_evaluation(
     dataset = RankingDataset(validation)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)
     model = build_model(checkpoint).to(device).eval()
-    stats = evaluate(model, loader, device, "DeepFM Validation evaluation")
+    stats = evaluate(
+        model,
+        loader,
+        device,
+        progress_description="DeepFM Validation evaluation",
+    )
     result = {
         "protocol": {"split": "validation", "test_accessed": False, "selection_artifact_contains_test": False, "batch_size": batch_size},
         "checkpoint_epoch": int(checkpoint["epoch"]),
