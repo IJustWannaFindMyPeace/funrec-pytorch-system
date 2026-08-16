@@ -1,0 +1,15 @@
+{
+  "experiment": "baseline-v1-training-serving-aligned-scoring",
+  "status": "preregistered",
+  "git_commit": "07935ed1bd9881526cc3b62bb4f1f65204abd8de",
+  "hypothesis": "Using the same raw movie-vector scoring contract at Validation retrieval that the frozen Baseline V1 full-softmax objective used during training can improve delivered top-K retrieval without retraining.",
+  "single_core_variable": "item_scoring=training_raw: use the frozen checkpoint's raw movie_embedding.weight[1:] for retrieval instead of the exported L2-normalized item vectors.",
+  "unchanged": ["Frozen Baseline V1 Epoch-14 checkpoint", "History-10 masked mean user encoder", "Validation users and chronological split", "history filtering", "K values", "five frozen acceptance thresholds", "no retraining"],
+  "checkpoint": {"path": "C:/Users/75469/Data/funrec-experiments/baseline-v0/web_project/saved_models/retrieval_best.pt", "sha256": "96108B0796096733DB1F96FC651513739076D416FCC467BACFFDAD1A4AF561C5", "epoch": 14, "selection_metric": "Validation loss", "checkpoint_contains_test": false},
+  "selection_artifact": {"path": "C:/Users/75469/Data/funrec-experiments/baseline-v1-activity-balanced-history10-rerun/web_project/train_eval_sample_final.pkl", "sha256": "728733A77B454F67AE2C3984500FB59BBADBEAACBFD14CA2F6480FF7EB7DF983", "top_level_keys_required": ["train", "validation"], "history_length": 10},
+  "evaluation": {"split": "validation", "device": "cuda", "batch_size": 512, "retraining": false, "output_must_not_exist": true},
+  "selection_boundary": {"test_accessed": false, "test_deserialized": false, "test_re_evaluated": false, "selection_artifact_contains_test": false},
+  "acceptance_thresholds": {"overall_recall_at_10_minimum": 0.1619536477, "overall_ndcg_at_10_minimum": 0.0727365714, "aq3_recall_at_10_minimum": 0.1101230878, "aq0_minus_aq3_recall_at_10_gap_maximum": 0.0883000445, "tail_pq0_recall_at_10_minimum": 0.0693963224, "decision_rule": "accept_only_if_all_five_thresholds_pass"},
+  "exploration_governance": {"hypothesis_family": "training-serving retrieval scoring alignment", "formal_candidate_limit": 1, "failure_closure": "If this no-retraining alignment candidate fails any frozen gate, retain it as a valid negative result and do not introduce a scoring variant."},
+  "application_rule": "Only a 5/5 Validation pass may be exported to a fresh deployment artifact directory; the sealed Test remains unavailable."
+}

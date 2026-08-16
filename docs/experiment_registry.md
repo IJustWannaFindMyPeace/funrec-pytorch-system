@@ -94,3 +94,8 @@
 
 - 用户确认停止模型搜索。attention/pooling 假设族已按两次同一 gap 门槛失败关闭；Train-only activity-balanced 的有效替代运行方向性失败且仅通过 1/5，故不把第二个候选当作必须消耗的配额。
 - 交付锚点为 `pytorch-baseline-v1`。最终叙事证据清单：`docs/final_story_evidence.md`；最终 PPTX：`docs/presentation/FunRec_Interview_Story_Final.pptx`。
+
+### 已批准的独立工程候选：训练—服务打分一致性
+
+- 用户批准一个不重训的独立候选，不重新开启 attention/pooling 或 activity reweighting 搜索。候选仅将冻结 Baseline V1 的 Validation 检索 item 向量由导出时的 L2-normalized 向量切换为训练 full-softmax 使用的原始电影向量。
+- 冻结配置：`docs/results/training_serving_alignment_preregistered_config.json`。五项 Validation 门槛不变；若未 5/5 通过，立即关闭该单候选工程方向，不引入评分变体；Test 保持封存。
