@@ -1,0 +1,35 @@
+{
+  "experiment": "v2-itemcf-channel-diagnostic",
+  "status": "preregistered",
+  "git_commit": "358c56c",
+  "purpose": "Measure whether a Train-only, explainable ItemCF channel adds candidates missed by the fixed V2 scaled-cosine two-tower baseline before any merge, reranking, deployment, or long training decision.",
+  "hypothesis": "Popularity-normalized item co-occurrence from Train interactions supplies complementary local-transition candidates, particularly for long-tail validation targets, without using any held-out interaction.",
+  "algorithm": {
+    "weight": "w_ij = sum_{u in U_ij} [1 / log(1 + |I_u|)] / sqrt(N_i N_j)",
+    "user_score": "S(u,j) = sum_{i in H_u} r(i,u) w_ij",
+    "recency_weight": "r(i,u)=1 for this channel-diagnostic; recency weighting is explicitly out of scope.",
+    "training_data": "Only the Train portion of the Train/Validation selection artifact; Validation targets and embargoed final interactions are excluded from index construction."
+  },
+  "fixed_protocol": {
+    "baseline": "V2-BASELINE-001 exported normalized two-tower candidates at K=50",
+    "itemcf_k": 50,
+    "history": "The same 10 encoded movie history entries exposed to each Validation query",
+    "selection_split": "validation only",
+    "test_accessed": false,
+    "test_deserialized": false,
+    "test_re_evaluated": false
+  },
+  "report_only_metrics": [
+    "per-channel Recall@10 and Recall@50",
+    "catalog coverage@50",
+    "ItemCF unique-hit rate: target is in ItemCF@50 and absent from two-tower@50",
+    "union Recall@50 with a fixed 25/25 two-tower/ItemCF round-robin quota",
+    "activity and target-popularity slices"
+  ],
+  "advancement_rule": "This diagnostic cannot deploy or change the two-tower model. It may justify freezing a separate ItemCF merge candidate only if ItemCF has positive unique-hit count and the fixed-quota union improves overall Recall@50 without worsening AQ3 Recall@50 or Tail PQ0 Recall@50 by more than 0.002. The final V2 joint gates remain a separate preregistration before any deployment decision.",
+  "integrity_rules": [
+    "Record a negative diagnostic and do not silently tune co-occurrence, history weighting, or merge quota after seeing the result.",
+    "Do not access, deserialize, or re-evaluate the sealed V1 Test split.",
+    "No existing experiment directory, model, log, or result may be overwritten."
+  ]
+}
