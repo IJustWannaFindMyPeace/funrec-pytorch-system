@@ -1,0 +1,12 @@
+{
+  "experiment": "baseline-v1-activity-balanced-history10",
+  "status": "preregistered",
+  "git_commit": "a3ce6a9a70b65ebf9aaeb6e68c2aac6eaeb7ce78",
+  "hypothesis": "Equalizing the aggregate Train loss mass of four Train-only activity groups can improve AQ3 recall and reduce the AQ0-AQ3 gap without damaging overall or tail retrieval.",
+  "single_core_variable": "loss_weighting=activity_balanced; per-example full-softmax loss is weighted only from Train-reconstructed activity quartiles.",
+  "unchanged": ["History-10 masked mean", "embedding_dim=16", "full-catalog softmax", "batch_size=128", "learning_rate=0.001", "seed=42", "per-user chronological train/validation split"],
+  "training": {"epochs_maximum": 30, "patience": 3, "batch_size": 128, "learning_rate": 0.001, "seed": 42, "device": "cuda", "history_pooling": "masked_mean", "max_sequence_length": 10, "loss_weighting": "activity_balanced", "checkpoint_selection_metric": "validation_loss", "resume": false},
+  "selection_boundary": {"allowed_split": "validation", "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false, "selection_artifact_contains_test": false},
+  "acceptance_thresholds": {"overall_recall_at_10_minimum": 0.1619536477, "overall_ndcg_at_10_minimum": 0.0727365714, "aq3_recall_at_10_minimum": 0.1101230878, "aq0_minus_aq3_recall_at_10_gap_maximum": 0.0883000445, "tail_pq0_recall_at_10_minimum": 0.0693963224, "decision_rule": "accept_only_if_all_five_thresholds_pass"},
+  "exploration_governance": {"hypothesis_family": "train-only activity-balanced retrieval objective", "formal_candidate_limit": 2, "closure_condition": "Two formal candidates fail the same decisive gate."}
+}
