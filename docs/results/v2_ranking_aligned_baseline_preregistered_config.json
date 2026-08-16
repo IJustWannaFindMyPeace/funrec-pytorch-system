@@ -1,0 +1,11 @@
+{
+  "experiment": "v2-ranking-aligned-baseline-seed42",
+  "status": "preregistered",
+  "git_commit": "8ec9084",
+  "purpose": "Establish a Test-safe DeepFM ranking baseline before evaluating whether ItemCF expands the candidate pool profitably.",
+  "single_core_variable": "ranking_data_protocol=selection_only: final interaction embargo, Train-only label statistics and Train-only random-negative history; DeepFM architecture and optimizer remain unchanged.",
+  "training": {"epochs_maximum": 30, "patience": 3, "batch_size": 128, "learning_rate": 0.001, "seed": 42, "device": "cuda", "checkpoint_selection_metric": "validation_loss", "resume": false},
+  "selection_boundary": {"allowed_split": "validation", "artifact_top_level_keys_required": ["train", "validation"], "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false},
+  "post_run_protocol": "Report Validation ranking metrics and artifact contract only. Freeze the separate candidate-pool expansion acceptance gates before an ItemCF-plus-DeepFM candidate result is evaluated.",
+  "integrity_rules": ["Use a new v2-ranking-aligned-baseline-seed42 external directory.", "Never overwrite or deserialize prior ranking artifacts that contain Test.", "Retain failures and do not deploy this calibration baseline directly."]
+}
