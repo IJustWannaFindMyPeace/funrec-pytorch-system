@@ -22,6 +22,15 @@ def test_selection_split_embargoes_final_interaction_per_user():
     assert validation["timestamp"].tolist() == [2, 2]
 
 
+def test_candidate_aware_negatives_use_train_only_unseen_item():
+    from offline.feature.preprocess_ranking import generate_candidate_aware_negatives
+    train = pd.DataFrame({"user_id":[1,1,2,2],"user_id_original":[1,1,2,2],"movie_id":[1,2,2,3],"genres":[1,2,2,3],"isAdult":[1]*4,"startYear":[1]*4,"movie_id_original":[1,2,2,3]})
+    samples = train.assign(is_click=[1,0,1,0], _sample_type="positive")
+    result = generate_candidate_aware_negatives(samples, train)
+    added = result[result["_sample_type"] == "candidate_aware_negative"]
+    assert (added["is_click"] == 0).all()
+
+
 def test_split_interactions_by_time_is_per_user_stable_and_disjoint():
     interactions = pd.DataFrame(
         {

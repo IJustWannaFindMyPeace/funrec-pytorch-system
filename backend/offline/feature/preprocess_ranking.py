@@ -27,6 +27,7 @@ from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
 
 from offline.config import config
+from offline.evaluation.itemcf import build_itemcf_index, recommend_itemcf
 
 
 def load_raw_data():
@@ -518,6 +519,39 @@ def convert_to_dict(df, feature_columns, label_column="is_click"):
         result["user_id_original"] = df["user_id_original"].values
     
     return result
+
+
+def generate_candidate_aware_negatives(train_df, train_interactions):
+    """Add one Train-only ItemCF hard negative for each positive row."""
+    neighbors = build_itemcf_index(train_interactions, max_user_items=100)
+    movie_features = train_interactions[
+        ["movie_id", "genres", "isAdult", "startYear", "movie_id_original"]
+    ].drop_duplicates("movie_id").set_index("movie_id").to_dict("index")
+    histories = train_interactions.groupby("user_id_original")["movie_id"].apply(list).to_dict()
+    rows = []
+    for _, positive in train_df[train_df["is_click"] == 1].iterrows():
+        user_id = positive["user_id_original"]
+        seen = set(histories.get(user_id, []))
+        candidate_ids = [
+            item_id for item_id in recommend_itemcf(
+                neighbors, [positive["movie_id"]], 50
+            ) if item_id not in seen
+        ][:1]
+        if not candidate_ids:
+            continue
+        candidate = candidate_ids[0]
+        features = movie_features.get(candidate)
+        if features is None:
+            continue
+        row = positive.copy()
+        for name, value in features.items():
+            row[name] = value
+        row["is_click"] = 0
+        row["_sample_type"] = "candidate_aware_negative"
+        rows.append(row)
+    if not rows:
+        return train_df
+    return pd.concat([train_df, pd.DataFrame(rows)], ignore_index=True)
 
 def run_ranking_preprocessing(
     neg_ratio_from_exposure=1,
