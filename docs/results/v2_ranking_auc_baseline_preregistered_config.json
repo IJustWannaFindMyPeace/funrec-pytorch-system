@@ -1,0 +1,12 @@
+{
+  "experiment": "v2-ranking-auc-baseline-seed42",
+  "status": "preregistered_replacement",
+  "replaces": "v2-ranking-aligned-baseline-seed42",
+  "replacement_reason": "The replaced run had a checkpoint-selection preregistration mismatch. No Test was accessed, but its metrics are not used.",
+  "git_commit": "6b7b37b",
+  "purpose": "Establish the Test-safe DeepFM V2 ranking calibration baseline under its actual and appropriate CTR selection metric.",
+  "single_core_variable": "checkpoint_selection_metric=validation_auc_maximize; all safe selection-only data construction, architecture, optimizer, seed, batch size and learning rate remain unchanged.",
+  "training": {"epochs_maximum": 30, "patience": 3, "batch_size": 128, "learning_rate": 0.001, "seed": 42, "device": "cuda", "checkpoint_selection_metric": "validation_auc_maximize", "resume": false},
+  "selection_boundary": {"allowed_split": "validation", "artifact_top_level_keys_required": ["train", "validation"], "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false},
+  "integrity_rules": ["Use a new v2-ranking-auc-baseline-seed42 external directory.", "Do not reuse or overwrite the protocol-invalid run.", "No candidate-pool result, deployment, or Test evaluation occurs in this calibration run."]
+}

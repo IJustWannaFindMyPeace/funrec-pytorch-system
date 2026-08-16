@@ -15,6 +15,7 @@
 | EXP-000 | completed | d65c9d6 | 42 | 三段时序切分、冲突修复、收敛校准、独立 Test、在线同工件验证 | Retrieval loss=6.282928（Epoch 14）；DeepFM AUC=0.866237（Epoch 5） | Recall@10=0.137086；NDCG@10=0.070298；DeepFM AUC=0.841382 | V0 已封存；离线评估与在线服务核心工件哈希一致 |
 | V2-BASELINE-001 | completed | 8fd4e3b | 42 | 修复训练—服务评分契约：scaled cosine，τ=10 | Recall@10=0.196192；NDCG@10=0.100597（Epoch 13） | 未访问 | V2 校准锚点；线上加载/哈希审计通过，但 activity gap=0.154837 仍是后续优化约束 |
 | V2-ITEMCF-001 | rejected | cbf4949 | 不适用 | Train-only recent-100 ItemCF，固定 25/25 候选融合 | ItemCF 有 390 个双塔@50 独特命中，但 union Recall@50=0.441391 < 0.450331 | 未访问 | 通道互补成立，固定 top-50 替换不成立；不部署、不调配额 |
+| V2-RANKING-001 | rejected | 6b7b37b | 42 | Test-safe ranking selection baseline | Validation AUC=0.864214（Epoch 5） | 未访问 | 预注册写 loss、代码实际按 AUC 选 checkpoint；协议无效，保留但不使用 |
 
 ## EXP-000 事实记录
 

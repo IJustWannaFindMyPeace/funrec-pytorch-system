@@ -1,0 +1,7 @@
+{
+  "experiment": "v2-ranking-aligned-baseline-seed42",
+  "status": "protocol_invalid",
+  "reason": "The preregistration declared Validation loss checkpoint selection, while train_ranking.py selected and early-stopped on Validation AUC. The run is retained but cannot be used as V2 baseline evidence, candidate selection, deployment, or presentation evidence.",
+  "observed": {"selected_checkpoint_epoch": 5, "validation_auc": 0.8642136323768168, "test_accessed": false},
+  "remediation": "Use a new external directory and a replacement preregistration declaring Validation AUC as the sole checkpoint selection and early-stopping metric."
+}
