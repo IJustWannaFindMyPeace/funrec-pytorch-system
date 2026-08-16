@@ -96,6 +96,11 @@ def load_training_artifacts():
     ) as file:
         vocab_dict = pickle.load(file)
 
+    if set(samples) != {"train", "validation"}:
+        raise ValueError(
+            "Ranking artifact must contain exactly Train and Validation; "
+            "Test must remain sealed"
+        )
     return samples, feature_dict, vocab_dict
 
 

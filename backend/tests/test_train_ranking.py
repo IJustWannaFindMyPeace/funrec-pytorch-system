@@ -4,6 +4,20 @@ import pytest
 import torch
 
 import offline.training.train_ranking as training
+
+
+def test_ranking_training_rejects_embedded_test_selection_artifact(monkeypatch, tmp_path):
+    samples_path = tmp_path / "ranking.pkl"
+    feature_path = tmp_path / "feature.pkl"
+    vocab_path = tmp_path / "vocab.pkl"
+    for path, value in ((samples_path, {"train": {}, "validation": {}, "test": {}}), (feature_path, {}), (vocab_path, {})):
+        with open(path, "wb") as file:
+            pickle.dump(value, file)
+    monkeypatch.setattr(training.config, "RANKING_TRAIN_DATA_PATH", samples_path)
+    monkeypatch.setattr(training.config, "RANKING_FEATURE_DICT_PATH", feature_path)
+    monkeypatch.setattr(training.config, "RANKING_VOCAB_DICT_PATH", vocab_path)
+    with pytest.raises(ValueError, match="exactly Train and Validation"):
+        training.load_training_artifacts()
 from modeling.deepfm import DeepFM
 from offline.config import config
 

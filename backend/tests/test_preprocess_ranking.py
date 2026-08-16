@@ -9,6 +9,19 @@ from offline.feature.preprocess_ranking import (
 )
 
 
+def test_selection_split_embargoes_final_interaction_per_user():
+    from offline.feature.preprocess_ranking import split_train_validation_with_final_embargo
+    frame = pd.DataFrame({
+        "user_id_original": [1, 1, 1, 2, 2, 2],
+        "timestamp": [1, 2, 3, 1, 2, 3],
+        "_source_row": [0, 1, 2, 3, 4, 5],
+        "rating": [5, 4, 3, 5, 4, 3],
+    })
+    train, validation = split_train_validation_with_final_embargo(frame)
+    assert train["timestamp"].tolist() == [1, 1]
+    assert validation["timestamp"].tolist() == [2, 2]
+
+
 def test_split_interactions_by_time_is_per_user_stable_and_disjoint():
     interactions = pd.DataFrame(
         {

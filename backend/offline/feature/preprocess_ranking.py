@@ -194,6 +194,25 @@ def split_interactions_by_time(
         ordered.loc[test_mask].copy(),
     )
 
+
+def split_train_validation_with_final_embargo(df_interactions):
+    """Return Train/Validation only, before materializing final interactions."""
+    ordered = df_interactions.sort_values(
+        ["user_id_original", "timestamp", "_source_row"],
+        kind="stable",
+    ).copy()
+    train_parts, validation_parts = [], []
+    for _, user_rows in ordered.groupby("user_id_original", sort=False):
+        if len(user_rows) < 3:
+            continue
+        selection_rows = user_rows.iloc[:-1]
+        train_parts.append(selection_rows.iloc[:-1])
+        validation_parts.append(selection_rows.iloc[[-1]])
+    return (
+        pd.concat(train_parts, ignore_index=True),
+        pd.concat(validation_parts, ignore_index=True),
+    )
+
 def assign_labels_from_training_history(
     train_interactions,
     validation_interactions,
@@ -235,6 +254,28 @@ def assign_labels_from_training_history(
         interactions["is_click"] = interactions["click"]
 
     return tuple(splits)
+
+
+def assign_selection_labels(train_interactions, validation_interactions):
+    """Label Train/Validation interactions using Train-period averages only."""
+    train_average = train_interactions.groupby("user_id_original")[
+        "rating"
+    ].mean()
+    outputs = []
+    for name, interactions in (
+        ("train", train_interactions),
+        ("validation", validation_interactions),
+    ):
+        frame = interactions.copy()
+        frame["user_avg_rating"] = frame["user_id_original"].map(train_average)
+        if frame["user_avg_rating"].isna().any():
+            raise ValueError(f"{name} contains users without Train labels")
+        frame["conversion"] = (frame["rating"] >= frame["user_avg_rating"]).astype(int)
+        frame["click"] = (frame["rating"] >= frame["user_avg_rating"] - 1).astype(int)
+        frame["exposure"] = 1
+        frame["is_click"] = frame["click"]
+        outputs.append(frame)
+    return tuple(outputs)
 
 def generate_negative_samples(
     df_merged,
@@ -483,6 +524,7 @@ def run_ranking_preprocessing(
     neg_ratio_random=2,
     validation_ratio=0.1,
     test_ratio=0.2,
+    selection_only=False,
 ):
     """Run strict chronological ranking preprocessing."""
     print("=" * 60)
@@ -496,26 +538,36 @@ def run_ranking_preprocessing(
         df_users,
     )
 
-    train_interactions, validation_interactions, test_interactions = (
+    if selection_only:
+        train_interactions, validation_interactions = (
+            split_train_validation_with_final_embargo(df_merged)
+        )
+        train_interactions, validation_interactions = (
+            assign_selection_labels(train_interactions, validation_interactions)
+        )
+        test_interactions = None
+    else:
+        train_interactions, validation_interactions, test_interactions = (
         split_interactions_by_time(
             df_merged,
             validation_ratio=validation_ratio,
             test_ratio=test_ratio,
         )
-    )
-    train_interactions, validation_interactions, test_interactions = (
+        )
+        train_interactions, validation_interactions, test_interactions = (
         assign_labels_from_training_history(
             train_interactions,
             validation_interactions,
             test_interactions,
         )
-    )
+        )
 
+    selection_source = train_interactions if selection_only else df_merged
     train_df = generate_negative_samples(
         train_interactions,
         movie_vocab,
-        all_interactions=df_merged,
-        interaction_history=df_merged,
+        all_interactions=selection_source,
+        interaction_history=selection_source,
         neg_ratio_from_exposure=neg_ratio_from_exposure,
         neg_ratio_random=neg_ratio_random,
         random_seed=42,
@@ -529,8 +581,8 @@ def run_ranking_preprocessing(
     validation_df = generate_negative_samples(
         validation_interactions,
         movie_vocab,
-        all_interactions=df_merged,
-        interaction_history=df_merged,
+        all_interactions=selection_source,
+        interaction_history=selection_source,
         excluded_pairs=train_random_pairs,
         neg_ratio_from_exposure=neg_ratio_from_exposure,
         neg_ratio_random=neg_ratio_random,
@@ -538,8 +590,9 @@ def run_ranking_preprocessing(
         random_seed=43,
     )
 
-    validation_random_pairs = random_pairs(validation_df)
-    test_df = generate_negative_samples(
+    if not selection_only:
+        validation_random_pairs = random_pairs(validation_df)
+        test_df = generate_negative_samples(
         test_interactions,
         movie_vocab,
         all_interactions=df_merged,
@@ -548,8 +601,8 @@ def run_ranking_preprocessing(
         neg_ratio_from_exposure=neg_ratio_from_exposure,
         neg_ratio_random=neg_ratio_random,
         include_all_hard_negatives=True,
-        random_seed=44,
-    )
+            random_seed=44,
+        )
 
     feature_columns = [
         "user_id", "gender", "age", "occupation", "zip_code",
@@ -561,12 +614,12 @@ def run_ranking_preprocessing(
         feature_columns,
         "is_click",
     )
-    test_data = convert_to_dict(test_df, feature_columns, "is_click")
     samples = {
         "train": train_data,
         "validation": validation_data,
-        "test": test_data,
     }
+    if not selection_only:
+        samples["test"] = convert_to_dict(test_df, feature_columns, "is_click")
 
     vocab_dict = {**user_vocab, **movie_vocab}
     feature_dict = {key: len(values) + 1 for key, values in vocab_dict.items()}
