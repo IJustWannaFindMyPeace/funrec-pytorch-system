@@ -1,0 +1,57 @@
+{
+  "experiment": "v2-aligned-baseline-seed42",
+  "status": "preregistered",
+  "git_commit": "48ca2fb5702a0ec539bdeef419214dd3fa69b266",
+  "purpose": "Establish a deployable V2 retrieval baseline after repairing the training-serving scoring contract; this is a calibration baseline, not an optimization candidate.",
+  "hypothesis": "Training the existing History-10 masked-mean two-tower model under the same scaled-cosine scoring contract used by export and online retrieval produces a valid V2 quality anchor.",
+  "single_core_variable": "scoring_contract=scaled_cosine_v2 with fixed logit_scale=10.0; no architecture, split, history length, loss weighting, embedding dimension, or optimizer change.",
+  "unchanged": [
+    "History-10 masked mean",
+    "embedding_dim=16",
+    "full-catalog softmax",
+    "batch_size=128",
+    "learning_rate=0.001",
+    "seed=42",
+    "uniform loss weighting",
+    "per-user chronological Train/Validation split"
+  ],
+  "training": {
+    "epochs_maximum": 30,
+    "patience": 3,
+    "batch_size": 128,
+    "learning_rate": 0.001,
+    "embedding_dim": 16,
+    "seed": 42,
+    "device": "cuda",
+    "history_pooling": "masked_mean",
+    "max_sequence_length": 10,
+    "loss_weighting": "uniform",
+    "scoring_contract": "scaled_cosine_v2",
+    "logit_scale": 10.0,
+    "checkpoint_selection_metric": "validation_loss",
+    "resume": false
+  },
+  "selection_boundary": {
+    "allowed_split": "validation",
+    "test_accessed": false,
+    "test_deserialized": false,
+    "test_re_evaluated": false,
+    "selection_artifact_top_level_keys_required": ["train", "validation"]
+  },
+  "post_run_protocol": {
+    "report": [
+      "overall Recall@10 and NDCG@10",
+      "AQ3 Recall@10",
+      "AQ0-AQ3 Recall@10 gap",
+      "Tail PQ0 Recall@10",
+      "training-export-online scoring parity"
+    ],
+    "decision": "Do not define or change V2 candidate acceptance thresholds from this run alone. First report this baseline and paired-bootstrap uncertainty; freeze V2 joint gates before evaluating ItemCF or any other candidate."
+  },
+  "integrity_rules": [
+    "Use a newly created v2-aligned-baseline-seed42 external experiment directory; never overwrite an existing experiment directory.",
+    "Do not access, deserialize, or re-evaluate the sealed V1 Test split.",
+    "Retain every result, including failures.",
+    "No deployment from this calibration baseline without a separately recorded acceptance decision."
+  ]
+}
