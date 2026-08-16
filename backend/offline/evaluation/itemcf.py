@@ -19,11 +19,15 @@ def train_user_sequences(train):
     return sequences
 
 
-def build_itemcf_index(train):
+def build_itemcf_index(train, max_user_items=None):
     """Build classic I2I weights exclusively from Train target sequences."""
     item_counts = Counter()
     cooccurrence = defaultdict(float)
+    if max_user_items is not None and max_user_items <= 1:
+        raise ValueError("max_user_items must be greater than one")
     for sequence in train_user_sequences(train).values():
+        if max_user_items is not None:
+            sequence = sequence[-max_user_items:]
         # Repeated consumption by a user is one co-occurrence event.
         items = list(dict.fromkeys(sequence))
         if len(items) < 2:

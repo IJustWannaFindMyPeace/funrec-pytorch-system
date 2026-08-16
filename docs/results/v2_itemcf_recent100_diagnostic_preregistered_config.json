@@ -1,0 +1,16 @@
+{
+  "experiment": "v2-itemcf-recent100-channel-diagnostic",
+  "status": "preregistered_replacement",
+  "replaces": "v2-itemcf-channel-diagnostic",
+  "replacement_reason": "The exact all-history co-occurrence implementation exceeded the bounded CPU diagnostic window before emitting metrics. No result was written or used. The replacement changes only the predeclared index-computation bound for deployability.",
+  "git_commit": "6f2f2e5",
+  "algorithm": {
+    "weight": "w_ij = sum_{u in U_ij} [1 / log(1 + |I_u|)] / sqrt(N_i N_j)",
+    "user_score": "S(u,j) = sum_{i in H_u} w_ij",
+    "index_input": "the most recent min(100, |I_u|) Train target interactions per user, deduplicated in chronological order",
+    "query_history": "the same 10 encoded movie history entries exposed to each Validation query"
+  },
+  "fixed_protocol": {"two_tower_baseline": "V2-BASELINE-001", "itemcf_k": 50, "fixed_union": "two_tower_top25_then_itemcf_top25_then_remaining", "split": "validation", "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false},
+  "advancement_rule": "The diagnostic cannot deploy. It may justify a separately preregistered merge candidate only if ItemCF has positive unique hits over two-tower@50 and the fixed union improves overall Recall@50 without worsening AQ3 Recall@50 or Tail PQ0 Recall@50 by more than 0.002.",
+  "integrity_rules": ["Do not tune the 100-item bound, merge quota, history weighting, or co-occurrence formula after seeing results.", "Retain the exact-ItemCF timeout as an engineering failure.", "Do not access the sealed V1 Test split."]
+}

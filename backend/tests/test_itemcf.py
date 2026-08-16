@@ -24,3 +24,12 @@ def test_itemcf_rejects_non_positive_k():
         assert "greater than zero" in str(error)
     else:
         raise AssertionError("ValueError was not raised")
+
+
+def test_itemcf_can_bound_each_users_recent_train_items():
+    neighbors = build_itemcf_index(
+        {"user_id": np.array([1, 1, 1]), "movie_id": np.array([1, 2, 3])},
+        max_user_items=2,
+    )
+    assert 1 not in neighbors
+    assert recommend_itemcf(neighbors, [2], k=1) == [3]
