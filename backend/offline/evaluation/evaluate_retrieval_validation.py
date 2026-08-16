@@ -56,10 +56,31 @@ def infer_sequence_length(split):
     return int(movie_history.shape[1])
 
 
+def item_embeddings_for_scoring(model, item_scoring):
+    """Return retrieval item vectors for an explicit scoring contract."""
+    if item_scoring == "exported_normalized":
+        movie_ids = torch.arange(
+            1,
+            model.feature_dict["movie_id"],
+            dtype=torch.long,
+            device=model.movie_embedding.weight.device,
+        )
+        return model.encode_item(movie_ids)
+    if item_scoring == "training_raw":
+        return model.movie_embedding.weight[1:]
+    raise ValueError("Unsupported item_scoring")
+
+
 @torch.no_grad()
-def predict_validation(validation, device, batch_size):
+def predict_validation(
+    validation,
+    device,
+    batch_size,
+    checkpoint_path=BEST_CHECKPOINT_PATH,
+    item_scoring="exported_normalized",
+):
     checkpoint = torch.load(
-        BEST_CHECKPOINT_PATH,
+        checkpoint_path,
         map_location="cpu",
         weights_only=True,
     )
@@ -83,11 +104,18 @@ def predict_validation(validation, device, batch_size):
     )
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device).eval()
-    item_embeddings = torch.as_tensor(
-        np.load(config.ITEM_EMB_PATH),
-        dtype=torch.float32,
-        device=device,
-    )
+    if item_scoring == "exported_normalized":
+        # Preserve the existing deployed-artifact evaluation path.
+        item_embeddings = torch.as_tensor(
+            np.load(config.ITEM_EMB_PATH),
+            dtype=torch.float32,
+            device=device,
+        )
+    else:
+        item_embeddings = item_embeddings_for_scoring(
+            model,
+            item_scoring,
+        )
     loader = DataLoader(
         RetrievalDataset(validation),
         batch_size=batch_size,
@@ -114,7 +142,14 @@ def predict_validation(validation, device, batch_size):
     )
 
 
-def run(output, expected_seq_len, device_name=None, batch_size=512):
+def run(
+    output,
+    expected_seq_len,
+    device_name=None,
+    batch_size=512,
+    checkpoint_path=BEST_CHECKPOINT_PATH,
+    item_scoring="exported_normalized",
+):
     if expected_seq_len <= 0:
         raise ValueError("expected_seq_len must be positive")
     if batch_size <= 0:
@@ -135,7 +170,11 @@ def run(output, expected_seq_len, device_name=None, batch_size=512):
 
     device = resolve_device(device_name)
     recommendations, targets, checkpoint_epoch, history_pooling = predict_validation(
-        validation, device, batch_size
+        validation,
+        device,
+        batch_size,
+        checkpoint_path=checkpoint_path,
+        item_scoring=item_scoring,
     )
     raw_user_counts = reconstruct_raw_user_activity(train)
     activity = lookup(
@@ -164,6 +203,7 @@ def run(output, expected_seq_len, device_name=None, batch_size=512):
             "device": str(device),
             "batch_size": batch_size,
             "k_values": list(K_VALUES),
+            "item_scoring": item_scoring,
         },
         "checkpoint_epoch": checkpoint_epoch,
         "overall": calculate_single_target_metrics(
@@ -194,6 +234,16 @@ def main():
     parser.add_argument("--device", default=None)
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        default=BEST_CHECKPOINT_PATH,
+    )
+    parser.add_argument(
+        "--item-scoring",
+        choices=("exported_normalized", "training_raw"),
+        default="exported_normalized",
+    )
     args = parser.parse_args()
     print(json.dumps(
         run(
@@ -201,6 +251,8 @@ def main():
             args.expected_seq_len,
             args.device,
             args.batch_size,
+            args.checkpoint,
+            args.item_scoring,
         ),
         indent=2,
         allow_nan=False,
