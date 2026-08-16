@@ -1,0 +1,18 @@
+{
+  "experiment": "baseline-v1-activity-balanced-history10",
+  "status": "protocol_invalid_test_deserialized",
+  "recorded_at": "2026-08-17",
+  "incident": "The formal run loaded baseline-v0/train_eval_sample_final.pkl. The artifact contains an embedded Test split, so loading it deserialized Test even though the training loop consumed only Train and Validation.",
+  "impact": [
+    "All checkpoints, logs, and training history from this directory are invalid for model selection, reporting, or PPT evidence.",
+    "The Validation evaluator rejected the embedded-Test artifact before emitting metrics."
+  ],
+  "remediation": [
+    "Do not delete, overwrite, reuse, or evaluate this run directory.",
+    "Build a new History-10 selection artifact whose top-level keys are exactly Train and Validation before any replacement run.",
+    "Use a fresh external experiment directory and a newly frozen preregistration for any replacement run."
+  ],
+  "test_accessed": true,
+  "test_re_evaluated": false,
+  "selection_valid": false
+}

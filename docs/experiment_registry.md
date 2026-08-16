@@ -77,3 +77,9 @@
 - 单路 personalized attention：AQ0-AQ3 gap=0.120463，超过 0.088300 上限，4/5 通过后拒绝。
 - 双时间尺度 attention：gap 降至 0.106017，但仍超过上限，4/5 通过后拒绝。结果：`docs/results/dualtimescale_attention20_validation_results.json`。
 - 因两次连续正式变体均由同一 gap 门槛拒绝，本假设族关闭；不得继续提出 activity-conditioned 或更复杂的 pooling 变体。
+
+### 协议无效事件：activity-balanced History-10
+
+- `baseline-v1-activity-balanced-history10` 错误复用了含嵌入 Test 的 Baseline V0 训练 artifact；加载 pickle 即发生 Test 反序列化，即使训练循环未消费 Test。
+- 所有该目录 checkpoint、日志和训练 history 均不可用于选型、报告或 PPT；Validation evaluator 在输出指标前拒绝该 artifact。
+- 目录不得删除、覆盖、复用或再次评估。必须从不含 Test 的 History-10 Train/Validation 工件重新开始。证据：`docs/results/activity_balanced_history10_protocol_incident.json`。
