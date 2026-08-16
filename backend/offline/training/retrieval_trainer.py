@@ -82,6 +82,7 @@ def train_one_epoch(
     device: torch.device,
     max_batches: Optional[int] = None,
     progress_description: Optional[str] = None,
+    user_loss_weights: Optional[Tensor] = None,
 ) -> TrainingStats:
     """Train for one pass, optionally stopping after a fixed batch count."""
     if max_batches is not None and max_batches <= 0:
@@ -109,7 +110,14 @@ def train_one_epoch(
 
         optimizer.zero_grad(set_to_none=True)
 
-        loss = model.compute_full_softmax_loss(features, targets)
+        if user_loss_weights is None:
+            loss = model.compute_full_softmax_loss(features, targets)
+        else:
+            weights = user_loss_weights[features["user_id"].long()]
+            per_example = model.compute_full_softmax_loss(
+                features, targets, reduction="none"
+            )
+            loss = (per_example * weights).sum() / weights.sum().clamp_min(1e-12)
 
         if not torch.isfinite(loss):
             raise FloatingPointError(

@@ -18,6 +18,17 @@ FEATURE_DICT = {
 }
 
 
+def test_activity_balanced_weights_use_only_train_user_activity():
+    train = {"user_id": [1, 1, 2, 3, 3, 3, 4, 4, 4, 4]}
+
+    weights = training.build_activity_balanced_user_weights(train)
+
+    assert weights.shape[0] == 5
+    assert weights[0].item() == 0.0
+    assert torch.isfinite(weights).all()
+    assert weights[1:].min().item() > 0.0
+
+
 def configure_temporary_export_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(
         training,

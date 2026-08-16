@@ -298,6 +298,7 @@ class YouTubeDNN(nn.Module):
         self,
         features: Dict[str, Tensor],
         movie_ids: Tensor,
+        reduction: str = "mean",
     ) -> Tensor:
         """Compute exact softmax loss over all non-padding movies."""
         movie_ids = movie_ids.long()
@@ -313,7 +314,9 @@ class YouTubeDNN(nn.Module):
         # Logit column 0 represents encoded movie ID 1.
         targets = movie_ids - 1
 
-        return F.cross_entropy(logits, targets)
+        if reduction not in {"none", "mean"}:
+            raise ValueError("reduction must be 'none' or 'mean'")
+        return F.cross_entropy(logits, targets, reduction=reduction)
 
     def forward(
         self,

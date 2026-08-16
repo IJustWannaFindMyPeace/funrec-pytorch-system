@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 
 from modeling.youtubednn import YouTubeDNN
 from offline.config import config
+from offline.evaluation.diagnose_validation import quantile_labels
 from offline.training.retrieval_data import RetrievalDataset
 from offline.training.retrieval_trainer import (
     evaluate_loss,
@@ -46,6 +47,21 @@ def set_random_seed(seed: int) -> None:
 
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def build_activity_balanced_user_weights(train):
+    """Build Train-only weights with equal total mass per activity quartile."""
+    user_ids = np.asarray(train["user_id"], dtype=np.int64)
+    counts = np.bincount(user_ids)
+    activity = counts.copy()
+    activity[activity > 0] += 3
+    groups = np.zeros_like(activity)
+    groups[1:] = quantile_labels(activity[1:])
+    group_counts = np.bincount(groups[user_ids], minlength=4).astype(float)
+    weights = np.zeros_like(activity, dtype=np.float32)
+    weights[1:] = 1.0 / group_counts[groups[1:]]
+    weights[1:] /= weights[user_ids].mean()
+    return torch.as_tensor(weights)
 
 
 def load_training_artifacts():
@@ -211,6 +227,7 @@ def run_retrieval_training(
     history_pooling: str = "masked_mean",
     max_sequence_length: int = config.MAX_SEQ_LEN,
     recent_history_length: int = 5,
+    loss_weighting: str = "uniform",
 ):
     """Run training, validation, checkpointing, and export."""
     if epochs <= 0:
@@ -229,6 +246,8 @@ def run_retrieval_training(
         raise ValueError("max_sequence_length must be positive")
     if history_pooling == "dual_timescale_attention" and not 0 < recent_history_length < max_sequence_length:
         raise ValueError("recent_history_length must be within max_sequence_length")
+    if loss_weighting not in {"uniform", "activity_balanced"}:
+        raise ValueError("Unsupported loss_weighting")
 
     set_random_seed(seed)
     device = resolve_device(device_name)
@@ -257,6 +276,9 @@ def run_retrieval_training(
         num_workers=num_workers,
         device=device,
     )
+    user_loss_weights = None
+    if loss_weighting == "activity_balanced":
+        user_loss_weights = build_activity_balanced_user_weights(samples["train"]).to(device)
 
     model = YouTubeDNN(
         feature_dict=feature_dict,
@@ -341,6 +363,7 @@ def run_retrieval_training(
             device=device,
             max_batches=max_train_batches,
             progress_description=f"Train {epoch}/{epochs}",
+            user_loss_weights=user_loss_weights,
         )
         validation_stats = evaluate_loss(
             model=model,
@@ -383,6 +406,7 @@ def run_retrieval_training(
             "history_pooling": history_pooling,
             "max_sequence_length": max_sequence_length,
             "recent_history_length": recent_history_length,
+            "loss_weighting": loss_weighting,
         }
 
         save_checkpoint(
@@ -509,6 +533,11 @@ def parse_args():
         default=config.MAX_SEQ_LEN,
     )
     parser.add_argument("--recent-history-length", type=int, default=5)
+    parser.add_argument(
+        "--loss-weighting",
+        choices=("uniform", "activity_balanced"),
+        default="uniform",
+    )
     return parser.parse_args()
 
 
@@ -529,6 +558,7 @@ def main():
         history_pooling=args.history_pooling,
         max_sequence_length=args.max_sequence_length,
         recent_history_length=args.recent_history_length,
+        loss_weighting=args.loss_weighting,
     )
 
 
