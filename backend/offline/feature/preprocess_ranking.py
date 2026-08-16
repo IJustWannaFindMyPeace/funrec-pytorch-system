@@ -559,6 +559,7 @@ def run_ranking_preprocessing(
     validation_ratio=0.1,
     test_ratio=0.2,
     selection_only=False,
+    candidate_aware_negatives=False,
 ):
     """Run strict chronological ranking preprocessing."""
     print("=" * 60)
@@ -606,6 +607,14 @@ def run_ranking_preprocessing(
         neg_ratio_random=neg_ratio_random,
         random_seed=42,
     )
+    if candidate_aware_negatives:
+        if not selection_only:
+            raise ValueError(
+                "candidate_aware_negatives requires selection_only=True"
+            )
+        train_df = generate_candidate_aware_negatives(
+            train_df, train_interactions
+        )
 
     def random_pairs(frame):
         random_rows = frame[frame["_sample_type"] == "random_negative"]
