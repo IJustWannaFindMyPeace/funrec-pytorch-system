@@ -397,3 +397,40 @@ class YouTubeDNN(nn.Module):
         if self.scoring_contract == SCORING_CONTRACT_SCALED_COSINE_V2:
             scores = scores * self.logit_scale
         return scores
+
+
+class MINDYouTubeDNN(YouTubeDNN):
+    """MIND-style multi-interest retrieval model under the V2 scoring contract."""
+
+    def __init__(self, *args, interest_count=2, routing_iterations=3, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.interest_count = interest_count
+        self.routing_iterations = routing_iterations
+        self.interest_pooling = DynamicRoutingInterestPooling(
+            self.embedding_dim, interest_count, routing_iterations
+        )
+
+    def encode_user_interests(self, features: Dict[str, Tensor]) -> Tensor:
+        static = [self.user_embeddings[name](features[name].long()) for name in self.USER_FEATURES]
+        movie_ids = features["hist_movie_id"].long()
+        genre_ids = features["hist_genres"].long()
+        movie_interests = self.interest_pooling(self.movie_embedding(movie_ids), movie_ids)
+        genre_mean = MaskedMeanPooling()(self.genre_embedding(genre_ids), genre_ids)
+        batch = movie_interests.shape[0]
+        static_part = torch.cat(static, dim=-1).unsqueeze(1).expand(-1, self.interest_count, -1)
+        genre_part = genre_mean.unsqueeze(1).expand(-1, self.interest_count, -1)
+        inputs = torch.cat([static_part, movie_interests, genre_part], dim=-1)
+        return F.normalize(self.user_dnn(inputs.reshape(batch * self.interest_count, -1)), p=2, dim=-1).reshape(batch, self.interest_count, -1)
+
+    def compute_full_logits(self, features: Dict[str, Tensor]) -> Tensor:
+        interests = self.encode_user_interests(features)
+        item_ids = torch.arange(1, self.feature_dict["movie_id"], device=interests.device)
+        items = self.encode_item(item_ids)
+        logits = torch.einsum("bkd,nd->bkn", interests, items).max(dim=1).values
+        return logits * self.logit_scale if self.scoring_contract == SCORING_CONTRACT_SCALED_COSINE_V2 else logits
+
+    def forward(self, features: Dict[str, Tensor], movie_ids: Tensor) -> Tensor:
+        interests = self.encode_user_interests(features)
+        items = self.encode_item(movie_ids)
+        scores = (interests * items.unsqueeze(1)).sum(dim=-1).max(dim=1).values
+        return scores * self.logit_scale if self.scoring_contract == SCORING_CONTRACT_SCALED_COSINE_V2 else scores

@@ -1,6 +1,6 @@
 import torch
 
-from modeling.youtubednn import DynamicRoutingInterestPooling, MaskedMeanPooling, YouTubeDNN
+from modeling.youtubednn import DynamicRoutingInterestPooling, MINDYouTubeDNN, MaskedMeanPooling, YouTubeDNN
 
 
 FEATURE_DICT = {
@@ -100,6 +100,13 @@ def test_user_and_item_embeddings_have_expected_shape_and_unit_norm():
         torch.ones(2),
         atol=1e-6,
     )
+
+
+def test_mind_full_logits_use_maximum_over_two_interests():
+    model = MINDYouTubeDNN(FEATURE_DICT, embedding_dim=16, scoring_contract="scaled_cosine_v2", logit_scale=10.0)
+    logits = model.compute_full_logits(build_features())
+    assert logits.shape == (2, FEATURE_DICT["movie_id"] - 1)
+    assert torch.isfinite(logits).all()
 
 
 def test_forward_returns_cosine_similarity_for_each_example():
