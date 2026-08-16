@@ -1,10 +1,25 @@
 import numpy as np
 import pytest
+import torch
+
+from modeling.youtubednn import YouTubeDNN
 
 from offline.evaluation.evaluate_retrieval_validation import (
     infer_sequence_length,
+    item_embeddings_for_scoring,
     validate_selection_samples,
 )
+
+
+FEATURE_DICT = {
+    "user_id": 4,
+    "age": 3,
+    "gender": 3,
+    "occupation": 3,
+    "zip_code": 3,
+    "movie_id": 5,
+    "genres": 4,
+}
 
 
 def split(length=3):
@@ -40,3 +55,21 @@ def test_sequence_length_rejects_misaligned_histories():
     value["hist_genres"] = np.zeros((2, 10), dtype=np.int64)
     with pytest.raises(ValueError, match="lengths differ"):
         infer_sequence_length(value)
+
+
+def test_training_raw_item_scoring_matches_full_softmax_columns():
+    model = YouTubeDNN(FEATURE_DICT, embedding_dim=4)
+    with torch.no_grad():
+        model.movie_embedding.weight[1:].copy_(torch.tensor([
+            [3.0, 4.0, 0.0, 0.0],
+            [1.0, 2.0, 2.0, 1.0],
+            [2.0, 0.0, 0.0, 0.0],
+            [1.0, 1.0, 1.0, 1.0],
+        ]))
+
+    raw = item_embeddings_for_scoring(model, "training_raw")
+    normalized = item_embeddings_for_scoring(model, "exported_normalized")
+
+    assert torch.equal(raw, model.movie_embedding.weight[1:])
+    assert torch.allclose(torch.linalg.vector_norm(normalized, dim=1), torch.ones(4))
+    assert not torch.allclose(raw, normalized)
