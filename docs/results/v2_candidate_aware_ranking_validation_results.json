@@ -1,0 +1,33 @@
+{
+  "experiment": "v2-candidate-aware-ranking-seed42",
+  "status": "validation_rejected",
+  "preregistration": "docs/results/v2_candidate_aware_ranking_preregistered_config.json",
+  "git_commits": {"training_input_audit": "b264a33", "candidate_pool_evaluator_fix": "fd87ea8"},
+  "training": {
+    "checkpoint_selection": "validation_auc_maximize",
+    "best_checkpoint_epoch": 2,
+    "best_validation_auc": 0.835647857043278,
+    "best_validation_loss": 0.4755025982943942,
+    "stopped_after_epoch": 5,
+    "early_stopping_reason": "three consecutive epochs without Validation AUC improvement"
+  },
+  "protocol": {
+    "split": "validation",
+    "common_cohort": 3989,
+    "test_accessed": false,
+    "test_deserialized": false,
+    "test_re_evaluated": false,
+    "baseline_pool": "two_tower_top50",
+    "candidate_pool": "two_tower_top50 plus ItemCF unique candidates, cap=100",
+    "ranking_checkpoint_epoch": 2
+  },
+  "metrics": {
+    "baseline_recall_at_10": 0.0917523205280304,
+    "candidate_recall_at_10": 0.061168212443590164,
+    "baseline_ndcg_at_10": 0.039670124650001526,
+    "candidate_ndcg_at_10": 0.02672351524233818,
+    "baseline_tail_pq0_recall_at_10": 0.027054108679294586,
+    "candidate_tail_pq0_recall_at_10": 0.009018036536872387
+  },
+  "decision": "Rejected. All three frozen end-to-end gates fail. The candidate-aware ranker also lowers two-tower-only reranked Recall@10 versus the fixed-V2-ranker reference (0.091752 versus 0.111306). Do not tune sampling ratio, ItemCF bound, pool cap, or acceptance thresholds; do not deploy. This is ranking hypothesis family candidate 1 of at most 2."
+}
