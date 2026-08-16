@@ -1,0 +1,45 @@
+{
+  "experiment": "v2-aligned-baseline-seed42",
+  "status": "completed_calibration_baseline",
+  "preregistration": "docs/results/v2_aligned_baseline_preregistered_config.json",
+  "git_head_at_training": "8fd4e3b1b59821359eff766cd5d4e5c985b176d3",
+  "training": {
+    "best_checkpoint_epoch": 13,
+    "best_validation_loss": 6.149694819166171,
+    "stopped_after_epoch": 16,
+    "stop_reason": "Validation loss failed to improve for patience=3 consecutive epochs",
+    "scoring_contract": "scaled_cosine_v2",
+    "logit_scale": 10.0
+  },
+  "validation_metrics": {
+    "overall_recall_at_10": 0.19619205594062805,
+    "overall_ndcg_at_10": 0.10059743374586105,
+    "aq0_recall_at_10": 0.2779237926006317,
+    "aq3_recall_at_10": 0.12308716028928757,
+    "aq0_minus_aq3_recall_at_10_gap": 0.15483663231134415,
+    "tail_pq0_recall_at_10": 0.09776902943849564
+  },
+  "comparison_to_v1_deployed_scoring": {
+    "v1_overall_recall_at_10": 0.1569536477,
+    "v1_overall_ndcg_at_10": 0.0777365714,
+    "delta_recall_at_10": 0.039238408240628056,
+    "delta_ndcg_at_10": 0.02286086234586105,
+    "interpretation": "This is a new V2 calibration anchor, not a threshold-qualified candidate or a statistically replicated deployment claim. The activity gap remains a material weakness."
+  },
+  "deployment_contract_audit": {
+    "isolated_online_loader": "passed",
+    "scoring_contract": "scaled_cosine_v2",
+    "logit_scale": 10.0,
+    "history_length": 10,
+    "item_embedding_shape": [3883, 16],
+    "manifest_hashes_verified": true
+  },
+  "protocol": {
+    "split": "validation",
+    "safe_selection_artifact_top_level_keys": ["train", "validation"],
+    "test_accessed": false,
+    "test_deserialized": false,
+    "test_re_evaluated": false
+  },
+  "next_decision": "Before evaluating ItemCF or another V2 candidate, freeze uncertainty-aware V2 joint acceptance gates using this calibration baseline and the declared business safeguards."
+}
