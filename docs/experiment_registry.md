@@ -45,6 +45,15 @@
 - 验证代码版本：`fe394f7`；证据：`docs/results/baseline_v0_online_verification.json`。
 - `EXP-000` 已满足 completed 定义；合并后创建 Baseline tag。
 
+## ATTENTION-20（正式预注册）
+
+- 状态：`preregistered`；尚未创建正式训练工件或启动训练。
+- 代码节点：`18dc8639203b77f2a4dc1db9976ad4c1ae33646e`；seed：42。
+- 唯一核心变量：History-20 的 `personalized_attention`，相对于已拒绝的 History-20 `masked_mean`；其余训练协议固定不变。
+- 完整配置与五项 Validation 准入门槛：`docs/results/attention20_preregistered_config.json`。
+- 选择边界：仅 Validation；封存 Test 禁止访问、反序列化和重新评估。
+- 后续状态转换：完成目录和命令审计并获得用户确认后，才可启动正式 GPU 训练；结果无论通过或拒绝均须登记。
+
 ## 单次实验必须保存
 
 - 实验 ID、假设、Git SHA、数据版本和切分统计。
