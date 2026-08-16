@@ -1,0 +1,16 @@
+{
+  "experiment": "v2-itemcf-recent100-channel-diagnostic",
+  "status": "diagnostic_rejected_for_fixed_quota_merge",
+  "preregistration": "docs/results/v2_itemcf_recent100_diagnostic_preregistered_config.json",
+  "protocol": {"split": "validation", "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false, "itemcf_index": "Train-only, most recent 100 target interactions per user", "fixed_union": "two_tower_top25_then_itemcf_top25_then_remaining"},
+  "validation_metrics": {
+    "two_tower_recall_at_50": 0.4503311216831207,
+    "itemcf_recall_at_50": 0.3592715263366699,
+    "fixed_quota_union_recall_at_50": 0.441390722990036,
+    "two_tower_recall_at_10": 0.19619205594062805,
+    "itemcf_recall_at_10": 0.12632450461387634,
+    "fixed_quota_union_recall_at_10": 0.19619205594062805
+  },
+  "incremental_coverage": {"itemcf_unique_hits_over_two_tower_at_50": 390, "itemcf_unique_hit_rate": 0.06456953642384106, "two_tower_catalog_coverage_at_50": 2643, "itemcf_catalog_coverage_at_50": 2726, "union_catalog_coverage_at_50": 2881},
+  "decision": "ItemCF is complementary but the preregistered 25/25 top-50 replacement reduces Recall@50 by 0.008940. Do not deploy, tune quota, or claim an end-to-end improvement. Preserve it as evidence that candidate-pool expansion should be evaluated at the existing DeepFM ranking stage under a separate preregistration."
+}
