@@ -55,6 +55,21 @@ def recommend_top_k(
     # Column 0 corresponds to encoded movie ID 1.
     return torch.topk(scores, k=k, dim=1).indices + 1
 
+
+@torch.no_grad()
+def recommend_top_k_multi_interest(model, features, item_embeddings, k):
+    """Top-K with max-over-interest scoring and standard history exclusion."""
+    interests = model.encode_user_interests(features)
+    scores = torch.einsum("bkd,nd->bkn", interests, item_embeddings).max(1).values
+    if getattr(model, "scoring_contract", None) == "scaled_cosine_v2":
+        scores = scores * model.logit_scale
+    history = features["hist_movie_id"].long()
+    valid = (history > 0) & (history <= item_embeddings.shape[0])
+    mask = torch.zeros_like(scores, dtype=torch.int32)
+    mask.scatter_add_(1, (history - 1).clamp_min(0), valid.to(torch.int32))
+    scores = scores.masked_fill(mask > 0, float("-inf"))
+    return torch.topk(scores, k=k, dim=1).indices + 1
+
 def recommend_popular_top_k(
     popularity: Tensor,
     history_ids: Tensor,

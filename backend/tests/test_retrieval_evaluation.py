@@ -6,6 +6,7 @@ from offline.evaluation.retrieval import (
     calculate_single_target_metrics,
     recommend_popular_top_k,
     recommend_top_k,
+    recommend_top_k_multi_interest,
 )
 
 
@@ -45,6 +46,16 @@ def test_recommend_top_k_filters_history_and_returns_encoded_ids():
     )
 
     assert recommendations.tolist() == [[3, 4]]
+
+
+def test_multi_interest_top_k_filters_history():
+    class Model:
+        scoring_contract = "scaled_cosine_v2"
+        logit_scale = 10.0
+        def encode_user_interests(self, features):
+            return torch.tensor([[[1.0, 0.0], [0.0, 1.0]]])
+    result = recommend_top_k_multi_interest(Model(), {"hist_movie_id": torch.tensor([[1, 0]])}, torch.eye(2), 1)
+    assert result.tolist() == [[2]]
 
 
 def test_single_target_metrics_use_true_rank():
