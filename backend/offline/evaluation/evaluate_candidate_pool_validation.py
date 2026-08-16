@@ -27,8 +27,19 @@ def rank_ids(model, static_features, movie_features, ids):
 
 def summarize(common_targets, baseline_ranked, candidate_ranked, tail_mask):
     targets = torch.as_tensor(common_targets)
-    baseline = torch.as_tensor(baseline_ranked)
-    candidate = torch.as_tensor(candidate_ranked)
+    def as_padded_tensor(rows):
+        if not rows:
+            raise ValueError("ranked candidate rows must not be empty")
+        width = max(len(row) for row in rows)
+        if width < 10:
+            raise ValueError("each ranked candidate row needs at least 10 items")
+        # Encoded movie ID zero is padding/OOV and never a valid target.
+        return torch.as_tensor(
+            [list(row) + [0] * (width - len(row)) for row in rows]
+        )
+
+    baseline = as_padded_tensor(baseline_ranked)
+    candidate = as_padded_tensor(candidate_ranked)
     metrics = {
         "baseline": calculate_single_target_metrics(baseline, targets, (10,)),
         "candidate": calculate_single_target_metrics(candidate, targets, (10,)),
