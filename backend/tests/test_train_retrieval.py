@@ -18,6 +18,16 @@ FEATURE_DICT = {
 }
 
 
+def test_training_rejects_artifacts_with_an_embedded_test_split():
+    with pytest.raises(ValueError, match="exactly Train and Validation"):
+        training.validate_training_selection_samples(
+            {"train": {}, "validation": {}, "test": {}}
+        )
+
+    valid = {"train": {}, "validation": {}}
+    assert training.validate_training_selection_samples(valid) is valid
+
+
 def configure_temporary_export_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(
         training,

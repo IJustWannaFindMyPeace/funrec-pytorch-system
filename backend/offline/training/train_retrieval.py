@@ -48,6 +48,19 @@ def set_random_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
+def validate_training_selection_samples(samples):
+    """Fail closed unless a training artifact contains only selection splits."""
+    if not isinstance(samples, dict) or set(samples) != {
+        "train",
+        "validation",
+    }:
+        raise ValueError(
+            "Training artifact must contain exactly Train and Validation; "
+            "Test must remain sealed"
+        )
+    return samples
+
+
 def load_training_artifacts():
     """Load preprocessed samples, feature sizes, and raw vocabularies."""
     required_paths = (
@@ -76,7 +89,7 @@ def load_training_artifacts():
     with open(config.VOCAB_DICT_PATH, "rb") as file:
         vocab_dict = pickle.load(file)
 
-    return samples, feature_dict, vocab_dict
+    return validate_training_selection_samples(samples), feature_dict, vocab_dict
 
 
 def build_data_loaders(
