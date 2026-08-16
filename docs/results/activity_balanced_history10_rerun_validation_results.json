@@ -1,0 +1,48 @@
+{
+  "experiment": "baseline-v1-activity-balanced-history10-rerun",
+  "status": "validation_rejected",
+  "preregistration": "docs/results/activity_balanced_history10_rerun_preregistered_config.json",
+  "git_head_at_run": "8542f63f4da39adeffd30eaff5474e51952e83e1",
+  "selection_artifact": {
+    "sha256": "728733A77B454F67AE2C3984500FB59BBADBEAACBFD14CA2F6480FF7EB7DF983",
+    "top_level_keys": ["train", "validation"],
+    "train_examples": 982089,
+    "validation_examples": 6040,
+    "history_length": 10
+  },
+  "training": {
+    "epochs_maximum": 30,
+    "epochs_completed": 25,
+    "early_stopping_patience": 3,
+    "checkpoint_selection_split": "validation",
+    "best_checkpoint_epoch": 22,
+    "best_validation_loss": 6.422596,
+    "stop_reason": "Validation loss did not improve for three consecutive epochs after Epoch 22."
+  },
+  "validation": {
+    "overall_recall_at_10": 0.15298013389110565,
+    "overall_ndcg_at_10": 0.07698729634284973,
+    "aq0_recall_at_10": 0.21353481709957123,
+    "aq3_recall_at_10": 0.08582834154367447,
+    "aq0_minus_aq3_recall_at_10_gap": 0.12770647555589676,
+    "tail_pq0_recall_at_10": 0.04921259731054306
+  },
+  "frozen_gate_decision": {
+    "overall_recall_at_10_minimum": {"threshold": 0.1619536477, "passed": false},
+    "overall_ndcg_at_10_minimum": {"threshold": 0.0727365714, "passed": true},
+    "aq3_recall_at_10_minimum": {"threshold": 0.1101230878, "passed": false},
+    "aq0_minus_aq3_recall_at_10_gap_maximum": {"threshold": 0.0883000445, "passed": false},
+    "tail_pq0_recall_at_10_minimum": {"threshold": 0.0693963224, "passed": false},
+    "passed_gates": 1,
+    "decision": "rejected"
+  },
+  "protocol": {
+    "validation_only": true,
+    "test_accessed": false,
+    "test_deserialized": false,
+    "test_re_evaluated": false,
+    "selection_artifact_contains_test": false,
+    "evaluation_note": "An initial evaluator invocation omitted the required --expected-seq-len argument and exited at argument parsing before loading any artifact. The successful invocation used --expected-seq-len 10."
+  },
+  "interpretation": "The Train-only activity-balanced loss did not improve the intended high-activity or tail slices; it worsened AQ3 and widened the AQ0-AQ3 gap. This valid result is retained as formal candidate 1 of the hypothesis family."
+}

@@ -88,3 +88,4 @@
 
 - 原运行仅因工件含嵌入 Test 而协议无效；其训练曲线、checkpoint 与任何未输出指标均不作为候选证据。替代运行仍是该独立假设族的第 1 个正式候选，而不是依据结果追加的变体。
 - 已冻结 `docs/results/activity_balanced_history10_rerun_preregistered_config.json`：五项 Validation 准入门槛、模型、超参和唯一核心变量完全不变；仅更换为 Train/Validation-only 工件，并在训练入口增加 fail-closed 校验。
+- 状态：`validation_rejected`。有效替代运行在 Epoch 25 因 `patience=3` 早停，按 Validation loss 选择 Epoch 22（loss=6.422596）。Validation Recall@10=0.152980、NDCG@10=0.076987、AQ3=0.085828、AQ0-AQ3 gap=0.127706、Tail PQ0=0.049213；仅 NDCG 通过，故 1/5 拒绝。Test 未访问、未反序列化、未重评估。完整证据：`docs/results/activity_balanced_history10_rerun_validation_results.json`。
