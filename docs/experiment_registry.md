@@ -99,3 +99,4 @@
 
 - 用户批准一个不重训的独立候选，不重新开启 attention/pooling 或 activity reweighting 搜索。候选仅将冻结 Baseline V1 的 Validation 检索 item 向量由导出时的 L2-normalized 向量切换为训练 full-softmax 使用的原始电影向量。
 - 冻结配置：`docs/results/training_serving_alignment_preregistered_config.json`。五项 Validation 门槛不变；若未 5/5 通过，立即关闭该单候选工程方向，不引入评分变体；Test 保持封存。
+- 状态：`validation_rejected`（2/5）。无重训的分数一致性修复把整体 Recall@10 从 0.156954 提升至 0.174669、NDCG@10 提升至 0.089458，但 AQ3=0.103127、AQ0-AQ3 gap=0.138003、Tail PQ0=0.063648 均未过线。它是可复现的整体检索改进，但不满足联合部署准入，故不替换 Baseline。完整证据：`docs/results/training_serving_alignment_validation_results.json`。

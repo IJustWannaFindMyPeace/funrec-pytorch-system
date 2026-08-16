@@ -14,6 +14,7 @@
 | Dual-timescale Attention-20 | 4/5；同一 gap 超限，关闭 attention/pooling 家族 | `docs/results/dualtimescale_attention20_validation_results.json` |
 | Activity-balanced 原运行 | 含 Test 的旧训练工件被反序列化；协议无效、隔离 | `docs/results/activity_balanced_history10_protocol_incident.json` |
 | Activity-balanced 替代运行 | 有效但 1/5，拒绝 | `docs/results/activity_balanced_history10_rerun_validation_results.json` |
+| 训练—服务打分一致性 | 无重训；整体 Recall/NDCG 改善，但 2/5，不能部署 | `docs/results/training_serving_alignment_validation_results.json` |
 
 ## 交付边界
 

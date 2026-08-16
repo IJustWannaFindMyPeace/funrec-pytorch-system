@@ -1,0 +1,12 @@
+{
+  "experiment": "baseline-v1-training-serving-aligned-scoring",
+  "status": "validation_rejected",
+  "preregistration": "docs/results/training_serving_alignment_preregistered_config.json",
+  "git_head_at_evaluation": "4f9130077dbef7ecbaade8d4c9e36536886932bb",
+  "candidate": {"checkpoint_epoch": 14, "history_pooling": "masked_mean", "history_length": 10, "retraining": false, "item_scoring": "training_raw", "meaning": "The retrieval score uses normalized user vectors against the frozen checkpoint's raw movie_embedding.weight[1:], matching the training full-softmax logits."},
+  "validation_metrics": {"overall_recall_at_10": 0.17466887831687927, "overall_ndcg_at_10": 0.08945771306753159, "aq0_recall_at_10": 0.24113009870052338, "aq3_recall_at_10": 0.10312707722187042, "aq0_minus_aq3_recall_at_10_gap": 0.13800302147865295, "tail_pq0_recall_at_10": 0.0636482909321785},
+  "frozen_acceptance_check": {"overall_recall_at_10_minimum": {"threshold": 0.1619536477, "passed": true}, "overall_ndcg_at_10_minimum": {"threshold": 0.0727365714, "passed": true}, "aq3_recall_at_10_minimum": {"threshold": 0.1101230878, "passed": false}, "aq0_minus_aq3_recall_at_10_gap_maximum": {"threshold": 0.0883000445, "passed": false}, "tail_pq0_recall_at_10_minimum": {"threshold": 0.0693963224, "passed": false}, "passed_gates": 2, "decision": "validation_rejected"},
+  "baseline_comparison": {"baseline_validation_recall_at_10": 0.1569536477, "candidate_minus_baseline_recall_at_10": 0.01771523061687927, "baseline_validation_ndcg_at_10": 0.0777365714, "candidate_minus_baseline_ndcg_at_10": 0.011721141667531595, "interpretation": "The scoring alignment improves overall Validation retrieval, but it worsens the activity gap and misses AQ3 and tail safeguards."},
+  "protocol": {"split": "validation", "safe_selection_artifact_top_level_keys": ["train", "validation"], "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false},
+  "closure": "This preregistered no-retraining engineering candidate is capped at one variant. It is retained as an applied overall-retrieval improvement but is not eligible to replace the Baseline deployment because it fails the frozen joint decision rule."
+}
