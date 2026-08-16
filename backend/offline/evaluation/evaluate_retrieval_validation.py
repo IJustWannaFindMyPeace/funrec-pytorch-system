@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from modeling.youtubednn import YouTubeDNN
+from modeling.youtubednn import MINDYouTubeDNN, YouTubeDNN
 from offline.config import config
 from offline.evaluation.diagnose_validation import (
     count_by_id,
@@ -26,6 +26,7 @@ from offline.evaluation.diagnose_validation_models import (
 from offline.evaluation.retrieval import (
     calculate_single_target_metrics,
     recommend_top_k,
+    recommend_top_k_multi_interest,
 )
 from offline.training.retrieval_data import RetrievalDataset
 from offline.training.retrieval_trainer import (
@@ -95,12 +96,14 @@ def predict_validation(
         )
     )
     recent_history_length = int(checkpoint_metrics.get("recent_history_length", 5))
-    model = YouTubeDNN(
+    model_class = MINDYouTubeDNN if checkpoint_metrics.get("model_type") == "mind_k2" else YouTubeDNN
+    model = model_class(
         feature_dict=checkpoint["feature_dict"],
         embedding_dim=config.EMB_DIM,
         history_pooling=history_pooling,
         max_sequence_length=max_sequence_length,
         recent_history_length=recent_history_length,
+        **({"interest_count": 2, "routing_iterations": 3} if model_class is MINDYouTubeDNN else {}),
     )
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device).eval()
@@ -128,11 +131,8 @@ def predict_validation(
         features, batch_targets = move_batch_to_device(
             features, batch_targets, device
         )
-        recommendations.append(
-            recommend_top_k(
-                model, features, item_embeddings, max(K_VALUES)
-            ).cpu()
-        )
+        predictor = recommend_top_k_multi_interest if model_class is MINDYouTubeDNN else recommend_top_k
+        recommendations.append(predictor(model, features, item_embeddings, max(K_VALUES)).cpu())
         targets.append(batch_targets.cpu())
     return (
         torch.cat(recommendations),

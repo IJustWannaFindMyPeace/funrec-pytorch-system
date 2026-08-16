@@ -460,6 +460,7 @@ def run_retrieval_training(
         save_history(TRAINING_HISTORY_PATH, history)
 
         checkpoint_metrics = {
+            "model_type": model_type,
             "train_loss": train_stats.loss,
             "validation_loss": validation_stats.loss,
             "best_validation_loss": best_validation_loss,
