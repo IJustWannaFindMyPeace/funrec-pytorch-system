@@ -1,0 +1,11 @@
+{
+  "experiment": "v2-mind-k2-seed42",
+  "status": "preregistered",
+  "purpose": "Test whether multiple routed user-interest vectors repair the V2 retrieval bottleneck without reopening the closed attention/pooling family or relying on unobserved ranking labels.",
+  "hypothesis": "A K=2 dynamic-routing interest representation can improve V2 Validation retrieval because one normalized user vector may compress distinct recent history interests.",
+  "single_core_variable": "user_encoder=dynamic_routing_multi_interest with K=2 and routing_iterations=3; item tower, History-10 Train/Validation artifact, full-catalog softmax, scaled-cosine contract and optimizer remain fixed.",
+  "training": {"epochs_maximum": 30, "patience": 3, "batch_size": 128, "learning_rate": 0.001, "embedding_dim": 16, "seed": 42, "device": "cuda", "history_length": 10, "interest_count": 2, "routing_iterations": 3, "scoring_contract": "scaled_cosine_v2", "logit_scale": 10.0, "checkpoint_selection_metric": "validation_loss", "resume": false},
+  "selection_boundary": {"allowed_split": "validation", "artifact_top_level_keys_required": ["train", "validation"], "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false},
+  "acceptance_rule": "Against the frozen V2 aligned baseline, require overall Recall@10 improvement of at least 0.003, NDCG@10 improvement of at least 0.002, AQ3 Recall@10 and Tail PQ0 Recall@10 each non-inferior within 0.002, and AQ0-AQ3 Recall@10 gap no worse by more than 0.002. No post-result threshold, K, routing-iteration, or seed changes.",
+  "closure": "This is a new retrieval hypothesis family with at most two formal candidates. If K=2 fails, diagnose its fixed Validation evidence before proposing at most one non-equivalent candidate; otherwise close the family."
+}
