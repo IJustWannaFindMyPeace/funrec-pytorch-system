@@ -1,0 +1,10 @@
+{
+  "experiment": "baseline-v1-dualtimescale-attention20",
+  "status": "validation_rejected",
+  "git_commit": "24eb5de",
+  "protocol": {"split": "validation", "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false, "selection_artifact_contains_test": false},
+  "candidate": {"history_pooling": "dual_timescale_attention", "history_length": 20, "recent_history_length": 5, "checkpoint_epoch": 18, "best_validation_loss": 6.076364994049072, "training_epochs_completed": 21, "early_stopping_patience": 3},
+  "validation_metrics": {"overall_recall_at_10": 0.19271522760391235, "overall_ndcg_at_10": 0.09890574961900711, "aq3_recall_at_10": 0.13905522227287292, "aq0_minus_aq3_recall_at_10_gap": 0.10601705312728882, "tail_pq0_recall_at_10": 0.12073490768671036},
+  "frozen_acceptance_check": {"overall_recall_passed": true, "overall_ndcg_passed": true, "aq3_passed": true, "activity_gap_passed": false, "tail_pq0_passed": true, "passed_count": 4, "required_count": 5, "decision": "validation_rejected"},
+  "conclusion": "The dual-timescale variant reduced the gap relative to single attention but still exceeded the unchanged gap limit. The attention/pooling hypothesis family is closed prospectively after two consecutive formal variants failed the same decisive gate."
+}

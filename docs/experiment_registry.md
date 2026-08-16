@@ -63,3 +63,17 @@
 - Validation/Test 指标及其候选集语义。
 - checkpoint、模型哈希、部署工件和运行环境。
 - 成功、失败、限制和下一步推理。
+
+## 前瞻性探索治理规则
+
+- 本规则不修改既有实验的五项 Validation 准入门槛；仅约束未来是否继续同一探索方向。
+- 同一假设族连续两次正式预注册候选因同一决定性门槛失败时，关闭该假设族。
+- 每个新假设族最多两次正式候选；第二次失败后必须转向不同因果层级，而不是继续增加同类模型复杂度。
+- 新假设族的预注册必须说明目标门槛、Train-only 实现方式、预期失败模式和关闭条件。
+- 若两个独立假设族均未产生 5/5 通过的候选，停止模型搜索，冻结可信 Baseline、失败迭代与机制证据，完成面试交付物。
+
+### 已关闭：History-20 attention/pooling
+
+- 单路 personalized attention：AQ0-AQ3 gap=0.120463，超过 0.088300 上限，4/5 通过后拒绝。
+- 双时间尺度 attention：gap 降至 0.106017，但仍超过上限，4/5 通过后拒绝。结果：`docs/results/dualtimescale_attention20_validation_results.json`。
+- 因两次连续正式变体均由同一 gap 门槛拒绝，本假设族关闭；不得继续提出 activity-conditioned 或更复杂的 pooling 变体。
