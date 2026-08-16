@@ -1,0 +1,8 @@
+{
+  "experiment": "v2-ranking-auc-baseline-seed42",
+  "status": "completed_calibration_baseline",
+  "preregistration": "docs/results/v2_ranking_auc_baseline_preregistered_config.json",
+  "training": {"best_checkpoint_epoch": 5, "best_validation_auc": 0.8642136323768168, "stopped_after_epoch": 8, "stop_reason": "Validation AUC failed to improve for patience=3 consecutive epochs", "selection_metric": "validation_auc_maximize"},
+  "protocol": {"split": "validation", "ranking_selection_artifact_top_level_keys": ["train", "validation"], "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false},
+  "note": "The legacy evaluate_ranking entry point is intentionally not invoked because it requires samples['test']; a Validation-only ranking evaluator is required before any candidate-pool experiment."
+}
