@@ -198,6 +198,7 @@ def export_retrieval_artifacts(
 
     torch.save(
         {
+            "model_type": "mind_k2" if isinstance(model_cpu, MINDYouTubeDNN) else "youtube_dnn",
             "feature_dict": dict(feature_dict),
             "embedding_dim": model_cpu.embedding_dim,
             "history_pooling": model_cpu.history_pooling,
@@ -205,6 +206,8 @@ def export_retrieval_artifacts(
             "recent_history_length": model_cpu.recent_history_length,
             "scoring_contract": model_cpu.scoring_contract,
             "logit_scale": model_cpu.logit_scale,
+            "interest_count": getattr(model_cpu, "interest_count", None),
+            "routing_iterations": getattr(model_cpu, "routing_iterations", None),
             "model_state_dict": model_cpu.state_dict(),
         },
         USER_MODEL_PATH,
@@ -240,6 +243,7 @@ def export_retrieval_artifacts(
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest = {
         "artifact_version": 2,
+        "model_type": "mind_k2" if isinstance(model_cpu, MINDYouTubeDNN) else "youtube_dnn",
         "scoring_contract": model_cpu.scoring_contract,
         "logit_scale": model_cpu.logit_scale,
         "files": {

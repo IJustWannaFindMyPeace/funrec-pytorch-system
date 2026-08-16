@@ -3,7 +3,7 @@ import pytest
 import torch
 
 import offline.training.train_retrieval as training
-from modeling.youtubednn import YouTubeDNN
+from modeling.youtubednn import MINDYouTubeDNN, YouTubeDNN
 from modeling.youtubednn import SCORING_CONTRACT_SCALED_COSINE_V2
 from offline.config import config
 
@@ -131,6 +131,15 @@ def test_export_persists_v2_scoring_contract(monkeypatch, tmp_path):
     )
     assert artifact["scoring_contract"] == SCORING_CONTRACT_SCALED_COSINE_V2
     assert artifact["logit_scale"] == 9.0
+
+
+def test_export_marks_mind_artifact_type(monkeypatch, tmp_path):
+    configure_temporary_export_paths(monkeypatch, tmp_path)
+    model = MINDYouTubeDNN(FEATURE_DICT, embedding_dim=4, scoring_contract=SCORING_CONTRACT_SCALED_COSINE_V2, logit_scale=10.0)
+    training.export_retrieval_artifacts(model, FEATURE_DICT, {"movie_id": np.array(["10", "20", "30", "40"])})
+    artifact = torch.load(training.USER_MODEL_PATH, map_location="cpu", weights_only=True)
+    assert artifact["model_type"] == "mind_k2"
+    assert artifact["interest_count"] == 2
 
 
 def test_export_rejects_misaligned_movie_vocabulary(
