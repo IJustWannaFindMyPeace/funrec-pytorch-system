@@ -1,0 +1,10 @@
+{
+  "experiment": "baseline-v1-dualtimescale-attention20",
+  "status": "preregistered",
+  "git_commit": "1b7139efd988f67815710bb4e5351043f1b86062",
+  "single_core_variable": "Replace single personalized attention with dual-timescale personalized attention: separate older-15 and recent-5 pooling, fused by the existing static-user query.",
+  "unchanged": ["embedding_dim=16", "full-catalog softmax", "batch_size=128", "learning_rate=0.001", "seed=42", "per-user chronological train/validation split"],
+  "training": {"epochs_maximum": 30, "patience": 3, "batch_size": 128, "learning_rate": 0.001, "seed": 42, "device": "cuda", "history_pooling": "dual_timescale_attention", "max_sequence_length": 20, "recent_history_length": 5, "checkpoint_selection_metric": "validation_loss", "resume": false},
+  "selection_boundary": {"allowed_split": "validation", "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false, "selection_artifact_contains_test": false},
+  "acceptance_thresholds": {"overall_recall_at_10_minimum": 0.1619536477, "overall_ndcg_at_10_minimum": 0.0727365714, "aq3_recall_at_10_minimum": 0.1101230878, "aq0_minus_aq3_recall_at_10_gap_maximum": 0.0883000445, "tail_pq0_recall_at_10_minimum": 0.0693963224, "decision_rule": "accept_only_if_all_five_thresholds_pass"}
+}
