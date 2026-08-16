@@ -524,34 +524,42 @@ def convert_to_dict(df, feature_columns, label_column="is_click"):
 def generate_candidate_aware_negatives(train_df, train_interactions):
     """Add one Train-only ItemCF hard negative for each positive row."""
     neighbors = build_itemcf_index(train_interactions, max_user_items=100)
+    feature_columns = ["genres", "isAdult", "startYear", "movie_id_original"]
     movie_features = train_interactions[
-        ["movie_id", "genres", "isAdult", "startYear", "movie_id_original"]
-    ].drop_duplicates("movie_id").set_index("movie_id").to_dict("index")
-    histories = train_interactions.groupby("user_id_original")["movie_id"].apply(list).to_dict()
-    rows = []
-    for _, positive in train_df[train_df["is_click"] == 1].iterrows():
-        user_id = positive["user_id_original"]
-        seen = set(histories.get(user_id, []))
-        candidate_ids = [
-            item_id for item_id in recommend_itemcf(
-                neighbors, [positive["movie_id"]], 50
-            ) if item_id not in seen
-        ][:1]
-        if not candidate_ids:
-            continue
-        candidate = candidate_ids[0]
-        features = movie_features.get(candidate)
-        if features is None:
-            continue
-        row = positive.copy()
-        for name, value in features.items():
-            row[name] = value
-        row["is_click"] = 0
-        row["_sample_type"] = "candidate_aware_negative"
-        rows.append(row)
-    if not rows:
+        ["movie_id", *feature_columns]
+    ].drop_duplicates("movie_id").set_index("movie_id")
+    histories = {
+        user_id: set(items)
+        for user_id, items in train_interactions.groupby("user_id_original")["movie_id"]
+    }
+    # ItemCF's ranking depends only on the positive item, not on the row.  Cache
+    # it once per movie; user-specific filtering happens below.
+    ranked_candidates = {
+        int(movie_id): recommend_itemcf(neighbors, [movie_id], 50)
+        for movie_id in train_df.loc[train_df["is_click"] == 1, "movie_id"].unique()
+    }
+    positive_rows = train_df.loc[train_df["is_click"] == 1].copy()
+    candidate_ids = []
+    for user_id, movie_id in zip(
+        positive_rows["user_id_original"], positive_rows["movie_id"]
+    ):
+        seen = histories.get(user_id, set())
+        candidate_ids.append(next(
+            (candidate for candidate in ranked_candidates[int(movie_id)] if candidate not in seen),
+            None,
+        ))
+    candidate_rows = positive_rows.assign(_candidate_movie_id=candidate_ids)
+    candidate_rows = candidate_rows.dropna(subset=["_candidate_movie_id"])
+    if candidate_rows.empty:
         return train_df
-    return pd.concat([train_df, pd.DataFrame(rows)], ignore_index=True)
+    candidate_rows["_candidate_movie_id"] = candidate_rows["_candidate_movie_id"].astype(int)
+    candidate_rows["movie_id"] = candidate_rows["_candidate_movie_id"]
+    for column in feature_columns:
+        candidate_rows[column] = candidate_rows["movie_id"].map(movie_features[column])
+    candidate_rows = candidate_rows.drop(columns="_candidate_movie_id")
+    candidate_rows["is_click"] = 0
+    candidate_rows["_sample_type"] = "candidate_aware_negative"
+    return pd.concat([train_df, candidate_rows], ignore_index=True)
 
 def run_ranking_preprocessing(
     neg_ratio_from_exposure=1,
