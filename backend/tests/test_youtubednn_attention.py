@@ -66,6 +66,27 @@ def test_attention_ignores_padding_embedding_values():
     assert torch.allclose(before, after, atol=1e-6)
 
 
+def test_attention_weights_are_normalized_and_ignore_padding():
+    model = YouTubeDNN(
+        feature_dict(),
+        embedding_dim=4,
+        history_pooling="personalized_attention",
+        max_sequence_length=4,
+    )
+    value = features()
+    static_embeddings = [
+        model.user_embeddings[name](value[name])
+        for name in model.USER_FEATURES
+    ]
+    query = torch.cat(static_embeddings, dim=-1)
+    ids = value["hist_movie_id"]
+    weights = model.movie_attention_pooling.attention_weights(
+        model.movie_embedding(ids), ids, query
+    )
+    assert torch.allclose(weights.sum(dim=1), torch.ones(2))
+    assert torch.allclose(weights[ids.eq(0)], torch.zeros(3))
+
+
 def test_attention_rejects_history_longer_than_configuration():
     model = YouTubeDNN(
         feature_dict(),

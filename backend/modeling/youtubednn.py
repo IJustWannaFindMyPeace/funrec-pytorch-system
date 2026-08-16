@@ -41,12 +41,13 @@ class PersonalizedPositionAwareAttentionPooling(nn.Module):
         )
         self.score_projection = nn.Linear(embedding_dim, 1, bias=False)
 
-    def forward(
+    def attention_weights(
         self,
         embeddings: Tensor,
         ids: Tensor,
         query: Tensor,
     ) -> Tensor:
+        """Return normalized weights with padding positions set to zero."""
         sequence_length = embeddings.shape[1]
         if sequence_length > self.max_sequence_length:
             raise ValueError(
@@ -66,7 +67,15 @@ class PersonalizedPositionAwareAttentionPooling(nn.Module):
         mask = ids.ne(0)
         scores = scores.masked_fill(~mask, -1e9)
         weights = torch.softmax(scores, dim=1) * mask.to(scores.dtype)
-        weights = weights / weights.sum(dim=1, keepdim=True).clamp_min(1e-12)
+        return weights / weights.sum(dim=1, keepdim=True).clamp_min(1e-12)
+
+    def forward(
+        self,
+        embeddings: Tensor,
+        ids: Tensor,
+        query: Tensor,
+    ) -> Tensor:
+        weights = self.attention_weights(embeddings, ids, query)
         return (embeddings * weights.unsqueeze(-1)).sum(dim=1)
 
 

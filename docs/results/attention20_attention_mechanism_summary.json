@@ -1,0 +1,36 @@
+{
+  "experiment": "baseline-v1-attention20-mechanism-diagnostic",
+  "status": "completed_not_causal",
+  "git_commit": "d6c65d8b128b976da979777161d37b2c2b914136",
+  "protocol": {
+    "split": "validation",
+    "test_accessed": false,
+    "test_deserialized": false,
+    "checkpoint_retrained": false,
+    "checkpoint_epoch": 20,
+    "history_length": 20,
+    "history_pooling": "personalized_attention",
+    "recent_position_count": 5
+  },
+  "movie_attention_by_activity": {
+    "aq0": {
+      "effective_history_length": 8.225960731506348,
+      "peak_weight": 0.36840009689331055,
+      "recent_5_weight_mass": 0.7558380961418152
+    },
+    "aq3": {
+      "effective_history_length": 9.628028869628906,
+      "peak_weight": 0.32268059253692627,
+      "recent_5_weight_mass": 0.7017596364021301
+    }
+  },
+  "genre_attention_by_activity": {
+    "aq0_recent_5_weight_mass": 0.1690022200345993,
+    "aq3_recent_5_weight_mass": 0.16530685126781464
+  },
+  "interpretation": {
+    "supported": "AQ3 movie attention is more diffuse and assigns less mass to the five most recent events than AQ0 under the rejected Attention-20 checkpoint.",
+    "not_supported": "This observational diagnostic does not establish that diffuse attention causes the AQ0-AQ3 gap, nor does it justify deleting older history.",
+    "next_hypothesis": "A future single-variable candidate may retain both time scales while learning an explicit recent-versus-older fusion, then face the unchanged five Validation gates."
+  }
+}

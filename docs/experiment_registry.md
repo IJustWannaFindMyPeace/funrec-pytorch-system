@@ -54,6 +54,7 @@
 - 选择边界：仅 Validation；封存 Test 禁止访问、反序列化和重新评估。
 - 训练：Epoch 1 后因执行环境时限中断；从 checkpoint 无覆盖恢复，Epoch 23 因 patience=3 早停，按 Validation loss 选择 Epoch 20。
 - 决策：Overall Recall@10=0.199007、NDCG@10=0.101495、AQ3 Recall@10=0.139721、Tail PQ0 Recall@10=0.120735 均通过；AQ0-AQ3 gap=0.120463 超过冻结上限 0.088300。仅通过 4/5，拒绝；Test 保持关闭。
+- 机制诊断：使用被拒绝候选的 Epoch 20 checkpoint、仅 Validation、无重训。AQ3 的 movie attention 有更长有效历史（9.628 对 AQ0 的 8.226）且近期 5 项权重更低（0.702 对 0.756）；genre 通道近期权重接近均匀。该相关性不证明因果，也不支持删除旧历史。证据：`docs/results/attention20_attention_mechanism_summary.json`。
 
 ## 单次实验必须保存
 

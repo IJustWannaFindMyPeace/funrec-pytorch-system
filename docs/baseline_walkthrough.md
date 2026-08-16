@@ -98,6 +98,8 @@ Baseline 的 Validation 切片显示高活跃 AQ3 与长尾 PQ0 是弱点；这�
 
 候选通过 4/5 项，却因活跃度 gap 超过预注册上限而被判定为 `validation_rejected`。这不是“Attention 无效”的结论：它改善了整体、AQ3 与长尾指标，但没有满足本项目对活跃度公平性的联合准入标准。门槛不因该结果修改，Test 继续封存。完整预注册与结果分别见 `docs/results/attention20_preregistered_config.json` 和 `docs/results/attention20_validation_results.json`。
 
+为提出下一假设，使用该候选的最佳 checkpoint 做了不重训的 Validation-only 机制诊断。AQ3 的 movie attention 有更长的有效历史长度（`9.628`，AQ0 为 `8.226`），更低的峰值权重（`0.323`，AQ0 为 `0.368`），且最近 5 项权重较低（`0.702`，AQ0 为 `0.756`）。genre attention 的最近 5 项权重在 AQ0/AQ3 间近似相同（`0.169`/`0.165`），且接近均匀分配。这支持“高活跃用户的电影近期兴趣可能未被足够聚焦”的可检验假设；它不证明因果，更不支持简单删除旧历史。下一候选如被批准，应在保留两个时间尺度的前提下学习近期—较早历史融合，并沿用原五项门槛。
+
 选择只使用 Validation。主要指标为整体 Recall@10；约束指标为最高活跃组 AQ3 Recall@10、AQ3–AQ0 差距、长尾 PQ0 Recall@10 和 NDCG@10。候选必须同时满足：整体 Recall@10 提升、AQ3 提升、活跃度差距缩小，且 PQ0 无明显退化。Test 继续封存。若长度增加只提高训练成本或稀释近期兴趣，则保留长度 10，并把该负结果写入故事。
 
 Sampled softmax主要解决超大类别空间的计算成本；当前只有 3,883 类且 exact softmax 可承受，不能预设它提升质量。固定每用户样本数、长尾重加权和 train–serve 归一化一致性均保留为后续独立消融，避免一次修改多个变量。
