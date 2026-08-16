@@ -17,3 +17,9 @@
 15. 迭代页模板：现象 → 假设 → 控制变量 → Validation → 机制 → 决策；明确区分真实结果、诊断相关性与未验证假设。
 
 最终 PPT 必须呈现真实的 Attention-20 `validation_rejected` 结果；不使用 Test 选择方向，也不把后续候选的指标提前写入。
+
+## 当前交付状态
+
+- 已生成真实 14 页文件：`docs/presentation/FunRec_Interview_Story.pptx`。
+- 生成器：`tools/build_interview_deck.py`；结构校验确认 14 页且每页具有标题、正文和页脚元素。
+- 当前 VS Code 环境未发现可调用的 PowerPoint 或 LibreOffice，故尚未完成逐页渲染视觉检查；不得将结构校验描述为已渲染检查。
