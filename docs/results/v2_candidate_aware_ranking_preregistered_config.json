@@ -1,0 +1,13 @@
+{
+  "experiment": "v2-candidate-aware-ranking-seed42",
+  "status": "preregistered",
+  "purpose": "Repair ranking-serving candidate-distribution mismatch exposed by the rejected ItemCF-plus-DeepFM evaluation.",
+  "hypothesis": "Adding Train-only I2I candidates that compete with each positive target as labeled hard negatives teaches DeepFM to distinguish retrieval-plausible alternatives, allowing complementary ItemCF candidates to be safely reranked.",
+  "single_core_variable": "negative_sampling=candidate_aware: for each Train positive, append a fixed number of non-interacted ItemCF candidates from a Train-only index; architecture, seed, optimizer, selection-only split and existing exposure/random negatives are unchanged.",
+  "train_only_boundary": {"i2i_index": "most-recent-100 Train interactions per user", "positive_targets": "Train positives only", "forbidden": ["Validation targets", "Validation histories", "sealed Test"]},
+  "fixed_candidate_parameters": {"itemcf_max_user_items": 100, "hard_negatives_per_positive": 1, "exclude_user_train_interactions": true},
+  "training": {"epochs_maximum": 30, "patience": 3, "batch_size": 128, "learning_rate": 0.001, "seed": 42, "device": "cuda", "checkpoint_selection_metric": "validation_auc_maximize"},
+  "selection_boundary": {"split": "validation", "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false},
+  "acceptance_rule": "Before deployment, evaluate the same frozen end-to-end candidate-pool protocol. Require Recall@10 +0.003, NDCG@10 +0.002, and Tail PQ0 non-inferior within -0.002 versus fixed-ranker baseline. No post-result sampling or threshold changes.",
+  "closure": "This is ranking hypothesis family candidate 1 of at most 2. If it fails for the same end-to-end gates, preserve the result and diagnose before any second candidate."
+}
