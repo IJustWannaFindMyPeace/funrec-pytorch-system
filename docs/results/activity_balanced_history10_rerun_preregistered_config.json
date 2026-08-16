@@ -1,0 +1,15 @@
+{
+  "experiment": "baseline-v1-activity-balanced-history10-rerun",
+  "status": "preregistered_replacement",
+  "replaces": "baseline-v1-activity-balanced-history10",
+  "replacement_reason": "The original formal run deserialized an embedded Test split and is protocol-invalid; no metrics from it are used.",
+  "git_commit": "eec16bbb92d07f4c60e33153062ba8e3bced8e49",
+  "hypothesis": "Equalizing the aggregate Train loss mass of four Train-only activity groups can improve AQ3 recall and reduce the AQ0-AQ3 gap without damaging overall or tail retrieval.",
+  "single_core_variable": "loss_weighting=activity_balanced; per-example full-softmax loss is weighted only from Train-reconstructed activity quartiles.",
+  "unchanged": ["History-10 masked mean", "embedding_dim=16", "full-catalog softmax", "batch_size=128", "learning_rate=0.001", "seed=42", "per-user chronological train/validation split"],
+  "selection_artifact": {"generation": "generate_train_validation_samples via --selection-only", "top_level_keys_required": ["train", "validation"], "final_interaction_policy": "embargoed before feature-value arrays are formed; no Test sample or Test artifact is created", "training_fail_closed_check": "train_retrieval rejects any artifact whose top-level keys are not exactly train and validation"},
+  "training": {"epochs_maximum": 30, "patience": 3, "batch_size": 128, "learning_rate": 0.001, "seed": 42, "device": "cuda", "history_pooling": "masked_mean", "max_sequence_length": 10, "loss_weighting": "activity_balanced", "checkpoint_selection_metric": "validation_loss", "resume": false},
+  "selection_boundary": {"allowed_split": "validation", "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false, "selection_artifact_contains_test": false},
+  "acceptance_thresholds": {"overall_recall_at_10_minimum": 0.1619536477, "overall_ndcg_at_10_minimum": 0.0727365714, "aq3_recall_at_10_minimum": 0.1101230878, "aq0_minus_aq3_recall_at_10_gap_maximum": 0.0883000445, "tail_pq0_recall_at_10_minimum": 0.0693963224, "decision_rule": "accept_only_if_all_five_thresholds_pass"},
+  "exploration_governance": {"hypothesis_family": "train-only activity-balanced retrieval objective", "formal_candidate_number": 1, "formal_candidate_limit": 2, "closure_condition": "Two formal candidates fail the same decisive gate."}
+}

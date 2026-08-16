@@ -83,3 +83,8 @@
 - `baseline-v1-activity-balanced-history10` 错误复用了含嵌入 Test 的 Baseline V0 训练 artifact；加载 pickle 即发生 Test 反序列化，即使训练循环未消费 Test。
 - 所有该目录 checkpoint、日志和训练 history 均不可用于选型、报告或 PPT；Validation evaluator 在输出指标前拒绝该 artifact。
 - 目录不得删除、覆盖、复用或再次评估。必须从不含 Test 的 History-10 Train/Validation 工件重新开始。证据：`docs/results/activity_balanced_history10_protocol_incident.json`。
+
+### 预注册替代运行：activity-balanced History-10
+
+- 原运行仅因工件含嵌入 Test 而协议无效；其训练曲线、checkpoint 与任何未输出指标均不作为候选证据。替代运行仍是该独立假设族的第 1 个正式候选，而不是依据结果追加的变体。
+- 已冻结 `docs/results/activity_balanced_history10_rerun_preregistered_config.json`：五项 Validation 准入门槛、模型、超参和唯一核心变量完全不变；仅更换为 Train/Validation-only 工件，并在训练入口增加 fail-closed 校验。
