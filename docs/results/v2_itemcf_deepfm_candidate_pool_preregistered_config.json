@@ -1,0 +1,12 @@
+{
+  "experiment": "v2-itemcf-deepfm-candidate-pool",
+  "status": "preregistered",
+  "purpose": "Test whether Train-only ItemCF's complementary candidates become final ranking gains when appended to, rather than replacing, the V2 two-tower candidate pool and scored by the fixed V2 DeepFM ranker.",
+  "common_validation_cohort": {"definition": "Ranking Validation click-positive rows whose encoded user/movie pair exactly matches Retrieval Validation", "examples": 3989, "target_alignment_verified": true},
+  "baseline": "V2 two-tower top-50 candidates, scored by fixed V2 DeepFM, report ranked Recall@10 and NDCG@10 on the common cohort.",
+  "candidate": "The same two-tower top-50 plus ItemCF recent-100 unique candidates up to a maximum pool size of 100, scored by the same frozen DeepFM; no retraining and no candidate score blending.",
+  "single_core_variable": "candidate_pool_expansion=append ItemCF unique candidates; all retrieval, ranking model weights, cohort, scoring, and final K remain fixed.",
+  "selection_boundary": {"split": "validation", "test_accessed": false, "test_deserialized": false, "test_re_evaluated": false},
+  "acceptance_rule": "Advance only if candidate improves common-cohort Recall@10 by at least 0.003 and NDCG@10 by at least 0.002, while common-cohort tail-PQ0 Recall@10 is non-inferior within 0.002. Otherwise retain the negative result and do not deploy or tune pool size.",
+  "integrity_rules": ["No post-result change to ItemCF bound=100, two-tower top-50, pool cap=100, or thresholds.", "Do not use sealed Test or any prior invalid ranking run.", "This evaluator produces no deployment action."]
+}
