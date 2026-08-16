@@ -243,6 +243,97 @@ def generate_train_eval_samples(
         "test": to_numpy(test_data_dict),
     }
 
+
+def generate_train_validation_samples(
+        data_df, user_columns, item_columns, max_hist_seq_len=10,
+        max_feat_seq_len=10, padding_value=0,
+    ):
+    """Build the Train/Validation selection artifact without materializing Test.
+
+    This is intentionally separate from :func:`generate_train_eval_samples`.
+    For each user, the final chronological interaction is an embargoed boundary:
+    it is not copied into a sample dictionary, serialized, or returned.  The
+    penultimate interaction remains the Validation target, and earlier
+    interactions form the sliding-window Train examples.
+    """
+    if max_hist_seq_len <= 0:
+        raise ValueError("max_hist_seq_len must be greater than zero")
+    if max_feat_seq_len <= 0:
+        raise ValueError("max_feat_seq_len must be greater than zero")
+    data_df = data_df.sort_values(
+        ["timestamp", "_source_row"],
+        kind="stable",
+    )
+    train_data_dict = defaultdict(list)
+    validation_data_dict = defaultdict(list)
+
+    def append_validation_sample(user_id, grouped_feats, target_index):
+        validation_data_dict["user_id"].append(user_id)
+        for col in user_columns:
+            validation_data_dict[col].append(grouped_feats[col].iloc[0])
+        for col in item_columns:
+            values = grouped_feats[col].tolist()
+            validation_data_dict["hist_" + col].append(
+                add_padding(
+                    values[:target_index],
+                    padding_value,
+                    max_hist_seq_len,
+                )
+            )
+            validation_data_dict[col].append(
+                add_padding(
+                    values[target_index],
+                    padding_value,
+                    max_feat_seq_len,
+                )
+            )
+
+    print("Generating Train/Validation samples only...")
+    for user_id, grouped_feats in tqdm(data_df.groupby("user_id")):
+        len_hist_seq = len(grouped_feats["movie_id"])
+        if len_hist_seq < 3:
+            continue
+
+        # The final interaction is deliberately embargoed. Slice it away
+        # before making feature-value arrays, so it cannot enter a returned
+        # sample through a target or a history field.
+        selection_feats = grouped_feats.iloc[:-1]
+        validation_index = len(selection_feats) - 1
+        append_validation_sample(
+            user_id,
+            selection_feats,
+            validation_index,
+        )
+
+        for i in range(1, validation_index):
+            train_data_dict["user_id"].append(user_id)
+            for col in user_columns:
+                train_data_dict[col].append(selection_feats[col].iloc[0])
+            for col in item_columns:
+                values = selection_feats[col].tolist()
+                train_data_dict["hist_" + col].append(
+                    add_padding(
+                        values[:i],
+                        padding_value,
+                        max_hist_seq_len,
+                    )
+                )
+                train_data_dict[col].append(
+                    add_padding(
+                        values[i],
+                        padding_value,
+                        max_feat_seq_len,
+                    )
+                )
+
+    def to_numpy(data):
+        return {key: np.asarray(value) for key, value in data.items()}
+
+    return {
+        "train": to_numpy(train_data_dict),
+        "validation": to_numpy(validation_data_dict),
+    }
+
 def run_retrieval_preprocessing(
     max_seq_len=config.MAX_SEQ_LEN,
     selection_only=False,
@@ -259,7 +350,12 @@ def run_retrieval_preprocessing(
     # 3. 生成样本
     user_columns = ["gender", "age", "occupation", "zip_code"]
     item_columns = ["movie_id", "genres", "isAdult", "startYear"]
-    samples  = generate_train_eval_samples(
+    sample_generator = (
+        generate_train_validation_samples
+        if selection_only
+        else generate_train_eval_samples
+    )
+    samples = sample_generator(
         df_merged,
         user_columns,
         item_columns,
@@ -270,23 +366,11 @@ def run_retrieval_preprocessing(
     # 4. 保存
     print("保存处理后的数据...")
     if selection_only:
-        selection_samples = {
-            "train": samples["train"],
-            "validation": samples["validation"],
-        }
-        sealed_test_path = (
-            config.TEMP_DIR / "retrieval_test_sealed.pkl"
-        )
         pickle.dump(
-            selection_samples,
+            samples,
             open(config.TRAIN_DATA_PATH, "wb"),
         )
-        pickle.dump(
-            {"test": samples["test"]},
-            open(sealed_test_path, "wb"),
-        )
         print(f"Selection-only 工件: {config.TRAIN_DATA_PATH}")
-        print(f"封存 Test 工件: {sealed_test_path}")
     else:
         pickle.dump(samples, open(config.TRAIN_DATA_PATH, "wb"))
     
@@ -313,8 +397,8 @@ def parse_args():
         "--selection-only",
         action="store_true",
         help=(
-            "Keep Train/Validation in the training artifact and seal Test "
-            "in a separate file."
+            "Write a Train/Validation-only artifact; the final interaction "
+            "per user remains embargoed and no Test artifact is created."
         ),
     )
     return parser.parse_args()

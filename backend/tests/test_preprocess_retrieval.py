@@ -4,6 +4,7 @@ import pytest
 from offline.feature.preprocess_retrieval import (
     add_padding,
     generate_train_eval_samples,
+    generate_train_validation_samples,
 )
 
 
@@ -44,6 +45,33 @@ def test_retrieval_samples_follow_strict_chronological_split():
 def test_padding_keeps_most_recent_values_and_left_pads():
     assert add_padding([1, 2, 3, 4], 0, 3) == [2, 3, 4]
     assert add_padding([1, 2], 0, 4) == [0, 0, 1, 2]
+
+
+def test_selection_samples_do_not_materialize_a_test_split():
+    interactions = pd.DataFrame(
+        {
+            "user_id": [1, 1, 1, 1, 1],
+            "movie_id": [20, 10, 21, 22, 23],
+            "timestamp": [20, 10, 20, 20, 30],
+            "_source_row": [0, 1, 2, 3, 4],
+        }
+    )
+
+    samples = generate_train_validation_samples(
+        interactions,
+        user_columns=[],
+        item_columns=["movie_id"],
+        max_hist_seq_len=3,
+        max_feat_seq_len=1,
+    )
+
+    assert set(samples) == {"train", "validation"}
+    assert samples["train"]["movie_id"].tolist() == [20, 21]
+    assert samples["validation"]["movie_id"].tolist() == [22]
+    assert 23 not in samples["train"]["movie_id"].tolist()
+    assert 23 not in samples["validation"]["movie_id"].tolist()
+    assert 23 not in samples["train"]["hist_movie_id"].tolist()
+    assert 23 not in samples["validation"]["hist_movie_id"].tolist()
 
 
 def test_retrieval_samples_reject_invalid_sequence_length():
