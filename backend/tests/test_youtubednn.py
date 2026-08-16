@@ -1,6 +1,6 @@
 import torch
 
-from modeling.youtubednn import MaskedMeanPooling, YouTubeDNN
+from modeling.youtubednn import DynamicRoutingInterestPooling, MaskedMeanPooling, YouTubeDNN
 
 
 FEATURE_DICT = {
@@ -68,6 +68,16 @@ def test_masked_mean_returns_zero_for_empty_history():
     result = pooling(embeddings, ids)
 
     assert torch.equal(result, torch.zeros((2, 3)))
+
+
+def test_dynamic_routing_interests_are_padded_safe_and_normalized():
+    pooling = DynamicRoutingInterestPooling(embedding_dim=2, interest_count=2, routing_iterations=3)
+    ids = torch.tensor([[0, 1, 2], [0, 0, 0]])
+    embeddings = torch.tensor([[[9., 9.], [1., 0.], [0., 1.]], [[3., 4.], [5., 6.], [7., 8.]]])
+    interests = pooling(embeddings, ids)
+    assert interests.shape == (2, 2, 2)
+    assert torch.allclose(torch.linalg.vector_norm(interests[0], dim=-1), torch.ones(2))
+    assert torch.equal(interests[1], torch.zeros((2, 2)))
 
 
 def test_user_and_item_embeddings_have_expected_shape_and_unit_norm():

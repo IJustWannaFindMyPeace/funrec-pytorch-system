@@ -25,6 +25,34 @@ class MaskedMeanPooling(nn.Module):
         return summed / counts
 
 
+class DynamicRoutingInterestPooling(nn.Module):
+    """Produce multiple normalized interests from a padded history (MIND core)."""
+
+    def __init__(self, embedding_dim: int, interest_count: int = 2, routing_iterations: int = 3):
+        super().__init__()
+        if embedding_dim <= 0 or interest_count <= 0 or routing_iterations <= 0:
+            raise ValueError("routing parameters must be positive")
+        self.interest_count = interest_count
+        self.routing_iterations = routing_iterations
+        self.interest_queries = nn.Parameter(torch.empty(interest_count, embedding_dim))
+        nn.init.normal_(self.interest_queries, std=0.01)
+
+    def forward(self, embeddings: Tensor, ids: Tensor) -> Tensor:
+        if embeddings.ndim != 3 or ids.shape != embeddings.shape[:2]:
+            raise ValueError("embeddings and IDs must be aligned [batch, history]")
+        mask = ids.ne(0)
+        logits = torch.einsum("bsd,kd->bsk", embeddings, self.interest_queries)
+        for iteration in range(self.routing_iterations):
+            masked_logits = logits.masked_fill(~mask.unsqueeze(-1), -1e9)
+            weights = torch.softmax(masked_logits, dim=-1) * mask.unsqueeze(-1)
+            interests = torch.einsum("bsk,bsd->bkd", weights, embeddings)
+            interests = F.normalize(interests, p=2, dim=-1)
+            if iteration + 1 < self.routing_iterations:
+                logits = logits + torch.einsum("bsd,bkd->bsk", embeddings, interests)
+        # Empty histories remain exact zero rather than an arbitrary unit vector.
+        return interests * mask.any(dim=1, keepdim=True).unsqueeze(-1)
+
+
 class PersonalizedPositionAwareAttentionPooling(nn.Module):
     """Pool history with user-conditioned, position-aware attention."""
 
