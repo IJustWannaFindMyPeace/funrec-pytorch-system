@@ -1,6 +1,7 @@
 """Train and export the PyTorch YouTubeDNN retrieval model."""
 
 import argparse
+import hashlib
 import json
 import pickle
 import random
@@ -12,7 +13,11 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 
-from modeling.youtubednn import YouTubeDNN
+from modeling.youtubednn import (
+    SCORING_CONTRACT_LEGACY_RAW_ITEM,
+    SUPPORTED_SCORING_CONTRACTS,
+    YouTubeDNN,
+)
 from offline.config import config
 from offline.evaluation.diagnose_validation import quantile_labels
 from offline.training.retrieval_data import RetrievalDataset
@@ -37,6 +42,15 @@ USER_MODEL_PATH = (
 TRAINING_HISTORY_PATH = (
     config.SAVED_MODELS_DIR / "retrieval_history.json"
 )
+
+
+def file_sha256(path: Path) -> str:
+    """Return a streaming SHA-256 digest for one exported artifact."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def set_random_seed(seed: int) -> None:
@@ -188,6 +202,8 @@ def export_retrieval_artifacts(
             "history_pooling": model_cpu.history_pooling,
             "max_sequence_length": model_cpu.max_sequence_length,
             "recent_history_length": model_cpu.recent_history_length,
+            "scoring_contract": model_cpu.scoring_contract,
+            "logit_scale": model_cpu.logit_scale,
             "model_state_dict": model_cpu.state_dict(),
         },
         USER_MODEL_PATH,
@@ -219,6 +235,23 @@ def export_retrieval_artifacts(
     np.save(config.ITEM_EMB_PATH, item_embeddings)
     np.save(config.MOVIE_IDS_PATH, raw_movie_ids)
 
+    manifest_path = config.RETRIEVAL_MANIFEST_PATH
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "artifact_version": 2,
+        "scoring_contract": model_cpu.scoring_contract,
+        "logit_scale": model_cpu.logit_scale,
+        "files": {
+            "vocab_dict.pkl": file_sha256(config.VOCAB_DICT_PATH),
+            "item_embeddings.npy": file_sha256(config.ITEM_EMB_PATH),
+            "movie_ids.npy": file_sha256(config.MOVIE_IDS_PATH),
+            "retrieval_user_model.pt": file_sha256(USER_MODEL_PATH),
+        },
+    }
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
     print("已导出召回模型:")
     print(f"  用户模型: {USER_MODEL_PATH}")
     print(f"  物品向量: {config.ITEM_EMB_PATH}")
@@ -241,6 +274,8 @@ def run_retrieval_training(
     max_sequence_length: int = config.MAX_SEQ_LEN,
     recent_history_length: int = 5,
     loss_weighting: str = "uniform",
+    scoring_contract: str = SCORING_CONTRACT_LEGACY_RAW_ITEM,
+    logit_scale: float = 1.0,
 ):
     """Run training, validation, checkpointing, and export."""
     if epochs <= 0:
@@ -261,6 +296,10 @@ def run_retrieval_training(
         raise ValueError("recent_history_length must be within max_sequence_length")
     if loss_weighting not in {"uniform", "activity_balanced"}:
         raise ValueError("Unsupported loss_weighting")
+    if scoring_contract not in SUPPORTED_SCORING_CONTRACTS:
+        raise ValueError("Unsupported scoring_contract")
+    if logit_scale <= 0:
+        raise ValueError("logit_scale must be positive")
 
     set_random_seed(seed)
     device = resolve_device(device_name)
@@ -299,6 +338,8 @@ def run_retrieval_training(
         history_pooling=history_pooling,
         max_sequence_length=max_sequence_length,
         recent_history_length=recent_history_length,
+        scoring_contract=scoring_contract,
+        logit_scale=logit_scale,
     ).to(device)
 
     optimizer = torch.optim.Adam(
@@ -420,6 +461,8 @@ def run_retrieval_training(
             "max_sequence_length": max_sequence_length,
             "recent_history_length": recent_history_length,
             "loss_weighting": loss_weighting,
+            "scoring_contract": scoring_contract,
+            "logit_scale": logit_scale,
         }
 
         save_checkpoint(
@@ -551,6 +594,12 @@ def parse_args():
         choices=("uniform", "activity_balanced"),
         default="uniform",
     )
+    parser.add_argument(
+        "--scoring-contract",
+        choices=tuple(sorted(SUPPORTED_SCORING_CONTRACTS)),
+        default=SCORING_CONTRACT_LEGACY_RAW_ITEM,
+    )
+    parser.add_argument("--logit-scale", type=float, default=1.0)
     return parser.parse_args()
 
 
@@ -572,6 +621,8 @@ def main():
         max_sequence_length=args.max_sequence_length,
         recent_history_length=args.recent_history_length,
         loss_weighting=args.loss_weighting,
+        scoring_contract=args.scoring_contract,
+        logit_scale=args.logit_scale,
     )
 
 

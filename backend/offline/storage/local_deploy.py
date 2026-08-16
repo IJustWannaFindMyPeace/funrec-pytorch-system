@@ -57,6 +57,7 @@ def deploy_recall_models(deploy_dir: Path):
     deployed_user_model_path = (
         recall_dir / "retrieval_user_model.pt"
     )
+    manifest_path = config.RETRIEVAL_MANIFEST_PATH
 
     if user_model_path.exists():
         shutil.copy2(
@@ -69,6 +70,10 @@ def deploy_recall_models(deploy_dir: Path):
             "  ✗ PyTorch 用户模型不存在: "
             f"{user_model_path}"
         )
+
+    if manifest_path.exists():
+        shutil.copy2(manifest_path, recall_dir / "retrieval_manifest.json")
+        print("  Copied retrieval_manifest.json")
 
 
 def deploy_ranking_models(deploy_dir: Path):

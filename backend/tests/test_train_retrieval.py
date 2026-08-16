@@ -4,6 +4,7 @@ import torch
 
 import offline.training.train_retrieval as training
 from modeling.youtubednn import YouTubeDNN
+from modeling.youtubednn import SCORING_CONTRACT_SCALED_COSINE_V2
 from offline.config import config
 
 
@@ -60,6 +61,11 @@ def configure_temporary_export_paths(monkeypatch, tmp_path):
         "MOVIE_IDS_PATH",
         tmp_path / "movie_ids.npy",
     )
+    monkeypatch.setattr(
+        config,
+        "RETRIEVAL_MANIFEST_PATH",
+        tmp_path / "retrieval_manifest.json",
+    )
 
 
 def test_export_retrieval_artifacts_are_safe_and_aligned(
@@ -101,6 +107,30 @@ def test_export_retrieval_artifacts_are_safe_and_aligned(
     )
     assert user_artifact["feature_dict"] == FEATURE_DICT
     assert user_artifact["embedding_dim"] == 4
+    manifest = __import__("json").loads(
+        config.RETRIEVAL_MANIFEST_PATH.read_text(encoding="utf-8")
+    )
+    assert manifest["files"]["item_embeddings.npy"]
+
+
+def test_export_persists_v2_scoring_contract(monkeypatch, tmp_path):
+    configure_temporary_export_paths(monkeypatch, tmp_path)
+    model = YouTubeDNN(
+        FEATURE_DICT,
+        embedding_dim=4,
+        scoring_contract=SCORING_CONTRACT_SCALED_COSINE_V2,
+        logit_scale=9.0,
+    )
+    training.export_retrieval_artifacts(
+        model=model,
+        feature_dict=FEATURE_DICT,
+        vocab_dict={"movie_id": np.array(["10", "20", "30", "40"])},
+    )
+    artifact = torch.load(
+        training.USER_MODEL_PATH, map_location="cpu", weights_only=True
+    )
+    assert artifact["scoring_contract"] == SCORING_CONTRACT_SCALED_COSINE_V2
+    assert artifact["logit_scale"] == 9.0
 
 
 def test_export_rejects_misaligned_movie_vocabulary(

@@ -7,6 +7,14 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 
+SCORING_CONTRACT_LEGACY_RAW_ITEM = "legacy_raw_item_v1"
+SCORING_CONTRACT_SCALED_COSINE_V2 = "scaled_cosine_v2"
+SUPPORTED_SCORING_CONTRACTS = {
+    SCORING_CONTRACT_LEGACY_RAW_ITEM,
+    SCORING_CONTRACT_SCALED_COSINE_V2,
+}
+
+
 class MaskedMeanPooling(nn.Module):
     """Average sequence embeddings while excluding padding ID 0."""
 
@@ -126,6 +134,8 @@ class YouTubeDNN(nn.Module):
         history_pooling: str = "masked_mean",
         max_sequence_length: int = 10,
         recent_history_length: int = 5,
+        scoring_contract: str = SCORING_CONTRACT_LEGACY_RAW_ITEM,
+        logit_scale: float = 1.0,
     ) -> None:
         super().__init__()
 
@@ -138,6 +148,14 @@ class YouTubeDNN(nn.Module):
         self.history_pooling = history_pooling
         self.max_sequence_length = max_sequence_length
         self.recent_history_length = recent_history_length
+        if scoring_contract not in SUPPORTED_SCORING_CONTRACTS:
+            raise ValueError(
+                f"Unsupported scoring_contract: {scoring_contract}"
+            )
+        if logit_scale <= 0:
+            raise ValueError("logit_scale must be positive")
+        self.scoring_contract = scoring_contract
+        self.logit_scale = float(logit_scale)
 
         self.user_embeddings = nn.ModuleDict(
             {
@@ -281,6 +299,17 @@ class YouTubeDNN(nn.Module):
         item_embedding = self.movie_embedding(movie_ids.long())
         return F.normalize(item_embedding, p=2, dim=-1)
 
+    def score_user_to_item_embeddings(
+        self,
+        user_embeddings: Tensor,
+        item_embeddings: Tensor,
+    ) -> Tensor:
+        """Score item vectors under this model's declared contract."""
+        scores = user_embeddings @ item_embeddings.transpose(0, 1)
+        if self.scoring_contract == SCORING_CONTRACT_SCALED_COSINE_V2:
+            scores = scores * self.logit_scale
+        return scores
+
     def compute_full_logits(
         self,
         features: Dict[str, Tensor],
@@ -288,11 +317,22 @@ class YouTubeDNN(nn.Module):
         """Compute logits against every non-padding movie class."""
         user_embedding = self.encode_user(features)
 
-        # Keep the training behavior of the original implementation:
-        # normalized user vectors against raw movie embedding weights.
-        item_weights = self.movie_embedding.weight[1:]
+        if self.scoring_contract == SCORING_CONTRACT_LEGACY_RAW_ITEM:
+            # Retain V1 checkpoint behavior for reproducibility only.
+            item_weights = self.movie_embedding.weight[1:]
+        else:
+            encoded_movie_ids = torch.arange(
+                1,
+                self.feature_dict["movie_id"],
+                dtype=torch.long,
+                device=user_embedding.device,
+            )
+            item_weights = self.encode_item(encoded_movie_ids)
 
-        return user_embedding @ item_weights.transpose(0, 1)
+        return self.score_user_to_item_embeddings(
+            user_embedding,
+            item_weights,
+        )
 
     def compute_full_softmax_loss(
         self,
@@ -325,4 +365,7 @@ class YouTubeDNN(nn.Module):
     ) -> Tensor:
         user_embedding = self.encode_user(features)
         item_embedding = self.encode_item(movie_ids)
-        return (user_embedding * item_embedding).sum(dim=-1)
+        scores = (user_embedding * item_embedding).sum(dim=-1)
+        if self.scoring_contract == SCORING_CONTRACT_SCALED_COSINE_V2:
+            scores = scores * self.logit_scale
+        return scores

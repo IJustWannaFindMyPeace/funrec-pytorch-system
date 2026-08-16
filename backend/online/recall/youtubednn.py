@@ -39,9 +39,15 @@ class YouTubeDNNRecallStrategy(RecallStrategy):
     def preprocess_user(
         self,
         user_features: Dict[str, Any],
-        max_hist_len: int = 10,
+        max_hist_len: int = None,
     ) -> Dict[str, Tensor]:
         """Encode raw online features as model-ready tensors."""
+        if max_hist_len is None:
+            max_hist_len = getattr(
+                self.resource_manager.user_model,
+                "max_sequence_length",
+                10,
+            )
         if max_hist_len <= 0:
             raise ValueError("max_hist_len must be greater than zero")
 
@@ -154,7 +160,13 @@ class YouTubeDNNRecallStrategy(RecallStrategy):
                 user_embedding = manager.user_model.encode_user(
                     model_inputs
                 )
-                scores = torch.matmul(
+                scores = manager.user_model.score_user_to_item_embeddings(
+                    user_embedding,
+                    manager.item_embedding_tensor,
+                )[0] if hasattr(
+                    manager.user_model,
+                    "score_user_to_item_embeddings",
+                ) else torch.matmul(
                     manager.item_embedding_tensor,
                     user_embedding[0],
                 )
