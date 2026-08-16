@@ -5,8 +5,8 @@ from pathlib import Path
 import aspose.slides as slides
 
 
-DECK = Path("docs/presentation/FunRec_Interview_Story_Final.pptx")
-OUTPUT = Path("docs/presentation/FunRec_Interview_Story_Final_rendered")
+DECK = Path("docs/presentation/FunRec_Interview_Story_Final_v2.pptx")
+OUTPUT = Path("docs/presentation/FunRec_Interview_Story_Final_v2_rendered")
 
 
 def main():

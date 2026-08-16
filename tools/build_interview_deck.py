@@ -9,7 +9,7 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
 
-OUT = Path("docs/presentation/FunRec_Interview_Story_Final.pptx")
+OUT = Path("docs/presentation/FunRec_Interview_Story_Final_v2.pptx")
 NAVY = (12, 20, 38)
 PANEL = (23, 35, 57)
 TEXT = (235, 241, 248)
@@ -29,8 +29,9 @@ SLIDES = [
     ("双时间尺度 Attention 也没有跨过决定性门槛", "保留 older-15 / recent-5，并学习融合；仍只用 Validation", ["gap 从 Attention-20 的 0.120463 降至 0.106017，但仍高于 0.088300 上限", "其余四项通过，仍是 4/5 拒绝", "同一 attention/pooling 假设族两次都在 gap 门槛失败，因此按治理规则关闭该方向"], "docs/results/dualtimescale_attention20_validation_results.json"),
     ("协议事故也进入故事：发现、隔离、修复", "透明记录失败比掩盖失败更重要", ["首个 activity-balanced 正式目录误载入含嵌入 Test 的旧工件，因反序列化 Test 而协议无效", "没有输出 Test 指标；该目录、日志和 checkpoint 全部隔离，不用于选择、报告或 PPT 指标", "修复：选择集预处理不再生成 Test；训练入口 fail-closed，只接受 train + validation", "修复代码经过 19 项相关测试，并以新目录、冻结配置重新开始"], "protocol incident；commits b4d883d/eec16bb"),
     ("失败对照二：activity-balanced loss 有效运行但方向错误", "唯一变量：仅依赖 Train 活跃度分位的 full-softmax 损失加权", ["有效替代运行：Epoch 25 早停；Validation loss 最佳 checkpoint 为 Epoch 22", "Recall@10 0.152980；NDCG@10 0.076987；AQ3 0.085828", "gap 0.127706；Tail PQ0 0.049213；仅 NDCG 通过，最终 1/5 拒绝", "说明此重加权没有改善目标切片，反而扩大高低活跃差距；Test 未访问"], "activity_balanced_history10_rerun_validation_results.json"),
+    ("可应用的工程修复：训练—服务打分一致性", "不重训；让 Validation 检索使用训练 full-softmax 的原始电影向量", ["整体 Recall@10：0.156954 → 0.174669；NDCG@10：0.077737 → 0.089458", "但 AQ3=0.103127、gap=0.138003、Tail PQ0=0.063648，最终仅通过 2/5", "这是可复现的整体检索改善，却不是可部署替代：联合门槛阻止牺牲弱切片", "结论：保留该工程发现与实现，不覆盖可信 Baseline，也不打开 Test"], "training_serving_alignment_validation_results.json"),
     ("探索终止：把‘不继续’变成预先定义的决策", "避免在同一方向无限调参", ["同一假设族最多两个正式候选；若两次在同一决定性门槛失败则关闭该族", "若两个独立假设族均未产生 5/5 候选，则停止模型搜索、冻结可信证据链", "attention/pooling 已关闭；Train-only activity reweighting 的首个有效候选方向性失败", "因此当前决策：停止搜索，不把候选 2 当成必须完成的配额"], "docs/experiment_registry.md（前瞻性探索治理规则）"),
-    ("最终推荐：部署可信 Baseline，而非伪优化候选", "用已经通过完整协议的模型交付，保留失败证据指导下一轮数据/产品工作", ["部署/演示锚点：冻结的 Baseline V1 与已核验的线上同工件链路", "不部署 Attention-20 或 activity-balanced：它们都没有通过预注册的联合准入", "后续优先级转向数据与产品验证：更多时间窗口、在线反馈、真正的 A/B 设计", "任何新模型方向需重新立项、预注册，并保留封存 Test 边界"], "实验注册表；所有候选均以 Validation 结论冻结"),
+    ("最终推荐：部署可信 Baseline，而非伪优化候选", "用已经通过完整协议的模型交付，保留失败证据指导下一轮数据/产品工作", ["部署/演示锚点：冻结的 Baseline V1 与已核验的线上同工件链路", "不部署 Attention-20、activity-balanced 或 training_raw：均未通过预注册的联合准入", "后续优先级转向数据与产品验证：更多时间窗口、在线反馈、真正的 A/B 设计", "任何新模型方向需重新立项、预注册，并保留封存 Test 边界"], "实验注册表；所有候选均以 Validation 结论冻结"),
     ("面试要点：我交付的是一条可审计的决策链", "迁移能力 + 实验设计 + 对失败的诚实处理", ["工程：将训练、导出、部署、服务和验证串成可复现的 PyTorch 系统", "科学：先修数据协议，冻结门槛，按切片而非平均数做模型选择", "判断：总体指标变好仍可拒绝；发现协议事故后隔离并修复防线", "结果：留下可信 Baseline、可解释的失败轨迹，以及清晰的停止条件"], "FunRec 项目最终交付"),
 ]
 

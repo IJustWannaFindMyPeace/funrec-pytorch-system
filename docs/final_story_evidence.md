@@ -18,7 +18,7 @@
 
 ## 交付边界
 
-- 最终 PPTX：`docs/presentation/FunRec_Interview_Story_Final.pptx`。
-- 已使用 Aspose.Slides 将真实 PPTX 渲染为 `docs/presentation/FunRec_Interview_Story_Final_rendered/slide-01.png` 至 `slide-15.png`，并逐页检查：15/15 页存在标题、正文和页脚，未发现空白页或版式溢出。渲染器处于评估模式，预览 PNG 带中央水印；水印不写入 PPTX，但会遮挡预览正文。因此面试前如可获得 PowerPoint/LibreOffice，仍应作一次无水印的人工放映复核。
+- 最终 PPTX：`docs/presentation/FunRec_Interview_Story_Final_v2.pptx`。
+- 已使用 Aspose.Slides 将真实 PPTX 渲染为 `docs/presentation/FunRec_Interview_Story_Final_v2_rendered/slide-01.png` 至 `slide-16.png`，并逐页检查。渲染器处于评估模式，预览 PNG 带中央水印；水印不写入 PPTX，但会遮挡预览正文。因此面试前如可获得 PowerPoint/LibreOffice，仍应作一次无水印的人工放映复核。
 - 可复现生成与渲染：`tools/build_interview_deck.py`、`tools/render_interview_deck.py`。
 - 任何新模型方向都需要新的假设、单一核心变量、预注册配置和用户对长时间训练的确认。
