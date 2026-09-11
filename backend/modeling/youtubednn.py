@@ -40,6 +40,9 @@ class YouTubeDNN(nn.Module):
         self,
         feature_dict: Dict[str, int],
         embedding_dim: int = 16,
+        history_pooling: str = "masked_mean",
+        max_sequence_length: int = 10,
+        recent_history_length: int = 5,
         scoring_contract: str = SCORING_CONTRACT_LEGACY_RAW_ITEM,
         logit_scale: float = 1.0,
     ) -> None:
@@ -47,9 +50,13 @@ class YouTubeDNN(nn.Module):
 
         self.feature_dict = dict(feature_dict)
         self.embedding_dim = embedding_dim
-        self.history_pooling = "masked_mean"
-        self.max_sequence_length = 10
-        self.recent_history_length = 5
+        if history_pooling != "masked_mean":
+            raise ValueError("Baseline V2 only supports masked_mean history pooling")
+        if max_sequence_length <= 0:
+            raise ValueError("max_sequence_length must be positive")
+        self.history_pooling = history_pooling
+        self.max_sequence_length = max_sequence_length
+        self.recent_history_length = recent_history_length
         if scoring_contract not in SUPPORTED_SCORING_CONTRACTS:
             raise ValueError(
                 f"Unsupported scoring_contract: {scoring_contract}"

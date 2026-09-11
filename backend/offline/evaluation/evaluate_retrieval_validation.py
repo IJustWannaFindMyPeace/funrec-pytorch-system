@@ -154,7 +154,7 @@ def run(
         )
 
     device = resolve_device(device_name)
-    recommendations, targets, checkpoint_epoch, history_pooling = predict_validation(
+    recommendations, targets, checkpoint_epoch = predict_validation(
         validation,
         device,
         batch_size,
