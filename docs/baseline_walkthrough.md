@@ -74,4 +74,3 @@ Validation AUC=0.866237，Test AUC=0.841382，下降 `0.024855`，即 2.49 个�
 - `backend/offline/feature/preprocess_ranking.py`
 - `backend/offline/evaluation/retrieval.py`
 - `docs/results/baseline_v0_*.json`
-

@@ -40,4 +40,3 @@ def test_concentration_reports_top_user_share():
     assert result["users"] == 4
     assert result["maximum"] == 7
     assert result["top_10_percent_user_share"] == pytest.approx(0.7)
-
