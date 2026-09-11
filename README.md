@@ -142,7 +142,7 @@ Validation 决定。
 - 排序：以 Validation ROC-AUC 与 loss 评估，早停监控 Validation AUC。
 - Test：只用于最终一次冻结验收，不参与探索、选模或门槛调整。
 - 训练入口会拒绝含有 `test` key 的选择工件，防止误用 Test。
-- Validation 评估结果默认拒绝覆盖已有文件，失败实验应原样保留。
+- Validation 评估结果默认拒绝覆盖已有文件，避免结果被意外替换。
 
 ## 安装依赖
 
@@ -318,7 +318,7 @@ uv run python -m offline.training.train_retrieval `
 ## Validation-only 评估
 
 以下命令只接受 Train/Validation-only 工件，不会加载 Test。输出路径必须是
-一个尚不存在的新文件，以保留每次实验记录。
+一个尚不存在的新文件，以保留每次评估记录。
 
 ### YouTubeDNN
 
@@ -483,91 +483,7 @@ python -m compileall app modeling offline online
 git diff --check
 ```
 
-## 历史迁移验收结果（V0）
-
-以下结果来自早期 PyTorch 迁移验收代码、MovieLens-1M 处理数据和实际运行
-日志，不是估算值。它们用于证明基础链路迁移成功，不代表当前
-`scaled_cosine_v2` 的 Validation-only 选模结果，也不得用于新的模型选择。
-
-### YouTubeDNN 召回训练
-
-训练环境：
-
-- GPU：NVIDIA GeForce RTX 5070
-- Epoch：3
-- Embedding 维度：16
-- 候选物品：3,883
-
-| Epoch | Train Loss | Validation Loss |
-| ---: | ---: | ---: |
-| 1 | 7.312562 | 7.208624 |
-| 2 | 6.770610 | 6.940392 |
-| 3 | 6.490195 | 6.787967 |
-
-### YouTubeDNN 冻结 Test 验收（历史记录）
-
-| Metric | YouTubeDNN | Popularity baseline | Relative lift |
-| --- | ---: | ---: | ---: |
-| Recall@5 | 0.055629 | 0.008940 | 6.2222× |
-| Hit Rate@5 | 0.055629 | 0.008940 | 6.2222× |
-| NDCG@5 | 0.033633 | 0.005721 | 5.8793× |
-| Recall@10 | 0.100662 | 0.019536 | 5.1525× |
-| Hit Rate@10 | 0.100662 | 0.019536 | 5.1525× |
-| NDCG@10 | 0.048037 | 0.009085 | 5.2874× |
-
-YouTubeDNN 在 6,040 位测试用户上取得：
-
-- Hit@5：336
-- Hit@10：608
-- 完整 GPU 检索评估耗时约 0.50 秒
-
-热门基线取得：
-
-- Hit@5：54
-- Hit@10：118
-
-由于每位测试用户只有一个相关目标物品，本评估协议下 Recall@K 与 Hit Rate@K 数值相同。
-
-### DeepFM 排序训练
-
-训练环境：
-
-- GPU：NVIDIA GeForce RTX 5070
-- 训练样本：1,925,407
-- 验证样本：449,828
-- Batch size：128
-- Epoch：3
-
-| Epoch | Train Loss | Train AUC | Validation Loss | Validation AUC |
-| ---: | ---: | ---: | ---: | ---: |
-| 1 | 0.405689 | 0.866792 | 0.437134 | 0.843122 |
-| 2 | 0.359169 | 0.898718 | 0.430139 | 0.852847 |
-| 3 | 0.340651 | 0.909774 | 0.440420 | 0.854670 |
-
-最佳 checkpoint：Epoch 3，Validation AUC 为 `0.854670`。
-
-### 在线推荐链路
-
-使用真实部署的 PyTorch 模型进行端到端 API 烟雾测试：
-
-- YouTubeDNN 召回候选：20
-- DeepFM 精排结果：10
-- `ranking_strategy`：`deepfm`
-- 历史电影重合：0
-- 排序分数保持降序
-- 召回分数得到保留
-- 海报 URL 正常生成
-- HTTP 状态：200
-
-### 测试结果
-
-迁移完成后的后端测试结果：
-
-```text
-146 passed
-```
-
-覆盖范围包括：
+当前测试覆盖范围包括：
 
 - YouTubeDNN 模型与训练工具
 - 召回训练、评估和热门基线

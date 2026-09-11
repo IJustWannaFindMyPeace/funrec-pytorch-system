@@ -1,4 +1,4 @@
-"""Evaluate one retrieval ablation on Validation without loading Test."""
+"""Evaluate the retrieval baseline on Validation without loading Test."""
 
 import argparse
 import json
@@ -177,7 +177,7 @@ def run(
     result = {
         "protocol": {
             "version": 1,
-            "experiment": "retrieval-history-length-ablation",
+            "evaluation": "retrieval-baseline-validation",
             "split": "validation",
             "test_accessed": False,
             "selection_artifact_contains_test": False,
@@ -213,7 +213,7 @@ def run(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Evaluate retrieval ablation on Validation only"
+        description="Evaluate the retrieval baseline on Validation only"
     )
     parser.add_argument("--expected-seq-len", type=int, required=True)
     parser.add_argument("--device", default=None)
