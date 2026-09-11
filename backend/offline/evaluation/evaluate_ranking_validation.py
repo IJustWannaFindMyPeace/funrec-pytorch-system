@@ -1,5 +1,6 @@
 """Evaluate a DeepFM ranking checkpoint on Validation only."""
 
+import argparse
 import json
 import pickle
 from pathlib import Path
@@ -56,3 +57,36 @@ def run_validation_evaluation(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(result, indent=2, allow_nan=False), encoding="utf-8")
     return result
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Evaluate DeepFM on Validation only"
+    )
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--device", default=None)
+    parser.add_argument("--batch-size", type=int, default=512)
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        default=BEST_CHECKPOINT_PATH,
+    )
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    print(json.dumps(
+        run_validation_evaluation(
+            output_path=args.output,
+            device_name=args.device,
+            batch_size=args.batch_size,
+            checkpoint_path=args.checkpoint,
+        ),
+        indent=2,
+        allow_nan=False,
+    ))
+
+
+if __name__ == "__main__":
+    main()

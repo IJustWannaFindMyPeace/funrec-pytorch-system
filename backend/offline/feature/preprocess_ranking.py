@@ -642,5 +642,9 @@ def run_ranking_preprocessing(
 
     return samples, feature_dict
 
+def main():
+    run_ranking_preprocessing(selection_only=True)
+
+
 if __name__ == "__main__":
-    run_ranking_preprocessing()
+    main()

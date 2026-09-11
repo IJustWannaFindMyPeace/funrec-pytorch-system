@@ -10,6 +10,7 @@ import argparse
 # intermittent c10.dll initialization failures.
 import torch  # noqa: F401
 
+from modeling.youtubednn import SCORING_CONTRACT_SCALED_COSINE_V2
 from offline.feature.preprocess_retrieval import run_retrieval_preprocessing
 from offline.feature.preprocess_ranking import run_ranking_preprocessing
 from offline.training.train_retrieval import run_retrieval_training
@@ -17,24 +18,45 @@ from offline.training.train_ranking import run_ranking_training
 from offline.storage.redis_ingest import ingest_to_redis
 from offline.storage.local_deploy import deploy_local
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(description="FunRec 离线流水线")
-    parser.add_argument("--steps", type=str, default="all", help="要执行的步骤: all, retrieval_preprocess, ranking_preprocess, retrieval_training, ranking_training, ingest, deploy")
+    parser.add_argument(
+        "--steps",
+        type=str,
+        default="all",
+        help=(
+            "要执行的步骤: all, retrieval_preprocess, ranking_preprocess, "
+            "retrieval_training, ranking_training, ingest, deploy"
+        ),
+    )
     parser.add_argument("--flush-redis", action="store_true", help="清空 Redis 数据库")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--retrieval-logit-scale",
+        type=float,
+        default=10.0,
+        help="scaled-cosine V2 召回训练的温度缩放系数",
+    )
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
     
     steps = args.steps.split(",")
     if "all" in steps:
         steps = ["retrieval_preprocess", "ranking_preprocess", "retrieval_training", "ranking_training", "ingest", "deploy"]
         
     if "retrieval_preprocess" in steps:
-        run_retrieval_preprocessing()
+        run_retrieval_preprocessing(selection_only=True)
 
     if "ranking_preprocess" in steps:
-        run_ranking_preprocessing()
+        run_ranking_preprocessing(selection_only=True)
 
     if "retrieval_training" in steps:
-        run_retrieval_training()
+        run_retrieval_training(
+            scoring_contract=SCORING_CONTRACT_SCALED_COSINE_V2,
+            logit_scale=args.retrieval_logit_scale,
+        )
 
     if "ranking_training" in steps:
         run_ranking_training()

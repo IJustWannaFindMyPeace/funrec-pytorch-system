@@ -393,20 +393,16 @@ def parse_args():
         type=int,
         default=config.MAX_SEQ_LEN,
     )
-    parser.add_argument(
-        "--selection-only",
-        action="store_true",
-        help=(
-            "Write a Train/Validation-only artifact; the final interaction "
-            "per user remains embargoed and no Test artifact is created."
-        ),
-    )
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def main():
     args = parse_args()
     run_retrieval_preprocessing(
         max_seq_len=args.max_seq_len,
-        selection_only=args.selection_only,
+        selection_only=True,
     )
+
+
+if __name__ == "__main__":
+    main()

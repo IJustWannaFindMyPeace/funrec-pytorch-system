@@ -12,10 +12,12 @@
 - PyTorch DeepFM 点击率排序
 - CUDA GPU 训练与 CPU/CUDA 在线推理
 - 全量 softmax 召回训练
+- scaled-cosine V2 训练/服务统一打分契约
 - Recall、Hit Rate、NDCG 离线评估
 - 全局热门召回基线对比
 - 断点续训、最佳 checkpoint 与训练历史
 - 模型、向量和词表工件部署
+- 部署 manifest、文件哈希和 fail-closed 工件校验
 - YouTubeDNN 召回、DeepFM 排序和多样性重排在线链路
 - Redis 用户画像、PostgreSQL 业务数据和 Elasticsearch 搜索
 - FastAPI 后端与 Web 前端
@@ -129,6 +131,19 @@ FUNREC_PROCESSED_DATA_PATH=C:\path\to\processed\data
 - `FUNREC_RAW_DATA_PATH`：解压后的原始数据目录
 - `FUNREC_PROCESSED_DATA_PATH`：预处理数据、checkpoint 和部署工件目录
 
+## 数据隔离与模型选择协议
+
+正式开发遵守按用户时间排序的数据隔离：训练阶段只生成和读取
+`Train/Validation` 选择工件，每位用户最后一次交互保持封存，不物化为
+Test split。模型、超参数、早停轮次以及是否接受一次优化均只能根据
+Validation 决定。
+
+- 召回：以 Validation Recall@K、NDCG@K 及分群指标评估。
+- 排序：以 Validation ROC-AUC 与 loss 评估，早停监控 Validation AUC。
+- Test：只用于最终一次冻结验收，不参与探索、选模或门槛调整。
+- 训练入口会拒绝含有 `test` key 的选择工件，防止误用 Test。
+- Validation 评估结果默认拒绝覆盖已有文件，失败实验应原样保留。
+
 ## 安装依赖
 
 进入后端目录：
@@ -234,6 +249,10 @@ uv run python -m offline.pipeline --steps all --flush-redis
 5. 用户特征写入 Redis
 6. 模型与工件部署
 
+预处理步骤强制生成 Train/Validation-only 工件；召回训练固定使用
+`scaled_cosine_v2`，默认 `logit_scale=10.0`。该契约在训练、导出和在线
+检索中统一使用 L2 归一化向量，避免训练分数与服务分数不一致。
+
 也可以单独执行步骤：
 
 ```powershell
@@ -251,65 +270,91 @@ uv run python -m offline.pipeline --steps deploy
 uv run python -m offline.pipeline --steps retrieval_preprocess,retrieval_training,deploy
 ```
 
+单独调用预处理模块同样固定为安全选择模式：
+
+```powershell
+uv run python -m offline.feature.preprocess_retrieval
+uv run python -m offline.feature.preprocess_ranking
+```
+
 ## 单独训练 YouTubeDNN
 
 ```powershell
 Set-Location .\backend
 
-python -m offline.training.train_retrieval `
+uv run python -m offline.training.train_retrieval `
     --epochs 3 `
     --device cuda `
-    --num-workers 0
+    --num-workers 0 `
+    --patience 2 `
+    --scoring-contract scaled_cosine_v2 `
+    --logit-scale 10
 ```
 
 使用 CPU：
 
 ```powershell
-python -m offline.training.train_retrieval `
+uv run python -m offline.training.train_retrieval `
     --epochs 3 `
     --device cpu `
-    --num-workers 0
+    --num-workers 0 `
+    --patience 2 `
+    --scoring-contract scaled_cosine_v2 `
+    --logit-scale 10
 ```
 
 断点续训：
 
 ```powershell
-python -m offline.training.train_retrieval `
+uv run python -m offline.training.train_retrieval `
     --epochs 5 `
     --device cuda `
     --num-workers 0 `
+    --scoring-contract scaled_cosine_v2 `
+    --logit-scale 10 `
     --resume
 ```
 
-## 评估 YouTubeDNN
+## Validation-only 评估
+
+以下命令只接受 Train/Validation-only 工件，不会加载 Test。输出路径必须是
+一个尚不存在的新文件，以保留每次实验记录。
+
+### YouTubeDNN
 
 ```powershell
 Set-Location .\backend
-python -m offline.evaluation.evaluate_retrieval --device cuda
+uv run python -m offline.evaluation.evaluate_retrieval_validation `
+    --expected-seq-len 10 `
+    --device cuda `
+    --output .\artifacts\retrieval_validation_run_001.json
 ```
 
 评估协议：
 
-- 测试用户：6,040
-- 每位用户一个目标物品
+- 每位 Validation 用户一个时间上晚于训练历史的目标物品
 - 过滤用户历史物品
-- 候选物品：3,883
-- Embedding 维度：16
-- 指标：Recall、Hit Rate、NDCG
-- 截断位置：5 和 10
+- 指标：Recall@K、Hit Rate@K、NDCG@K
+- 同时报告用户活跃度、目标物品流行度及其交叉分群结果
+- `test_accessed=false` 会写入协议元数据
 
-结果保存在：
+### DeepFM
 
-```text
-<FUNREC_PROCESSED_DATA_PATH>/web_project/retrieval_metrics.json
+```powershell
+uv run python -m offline.evaluation.evaluate_ranking_validation `
+    --device cuda `
+    --output .\artifacts\ranking_validation_run_001.json
 ```
+
+排序评估报告 Validation loss 和 ROC-AUC。ROC-AUC 表示随机抽取一个正样本
+和一个负样本时，模型把正样本排在负样本之前的概率。
 
 ## 单独训练 DeepFM
 
 ```powershell
 Set-Location .\backend
 
-python -m offline.training.train_ranking `
+uv run python -m offline.training.train_ranking `
     --epochs 3 `
     --device cuda `
     --num-workers 0 `
@@ -319,7 +364,7 @@ python -m offline.training.train_ranking `
 使用 CPU：
 
 ```powershell
-python -m offline.training.train_ranking `
+uv run python -m offline.training.train_ranking `
     --epochs 3 `
     --device cpu `
     --num-workers 0 `
@@ -329,7 +374,7 @@ python -m offline.training.train_ranking `
 断点续训：
 
 ```powershell
-python -m offline.training.train_ranking `
+uv run python -m offline.training.train_ranking `
     --epochs 5 `
     --device cuda `
     --num-workers 0 `
@@ -343,19 +388,19 @@ python -m offline.training.train_ranking `
 
 ```powershell
 Set-Location .\backend
-python -m offline.storage.local_deploy
+uv run python -m offline.storage.local_deploy
 ```
 
 仅部署召回模型：
 
 ```powershell
-python -m offline.storage.local_deploy --recall-only
+uv run python -m offline.storage.local_deploy --recall-only
 ```
 
 仅部署排序模型：
 
 ```powershell
-python -m offline.storage.local_deploy --ranking-only
+uv run python -m offline.storage.local_deploy --ranking-only
 ```
 
 部署目录：
@@ -366,7 +411,8 @@ python -m offline.storage.local_deploy --ranking-only
 │   ├── retrieval_user_model.pt
 │   ├── item_embeddings.npy
 │   ├── movie_ids.npy
-│   └── vocab_dict.pkl
+│   ├── vocab_dict.pkl
+│   └── retrieval_manifest.json
 └── ranking/
     ├── ranking_model.pt
     ├── model_config.pkl
@@ -437,9 +483,11 @@ python -m compileall app modeling offline online
 git diff --check
 ```
 
-## 真实实验结果
+## 历史迁移验收结果（V0）
 
-以下结果均来自本仓库迁移后的 PyTorch 代码、MovieLens-1M 处理数据和实际运行日志，不是估算值。
+以下结果来自早期 PyTorch 迁移验收代码、MovieLens-1M 处理数据和实际运行
+日志，不是估算值。它们用于证明基础链路迁移成功，不代表当前
+`scaled_cosine_v2` 的 Validation-only 选模结果，也不得用于新的模型选择。
 
 ### YouTubeDNN 召回训练
 
@@ -456,7 +504,7 @@ git diff --check
 | 2 | 6.770610 | 6.940392 |
 | 3 | 6.490195 | 6.787967 |
 
-### YouTubeDNN 召回评估
+### YouTubeDNN 冻结 Test 验收（历史记录）
 
 | Metric | YouTubeDNN | Popularity baseline | Relative lift |
 | --- | ---: | ---: | ---: |
@@ -516,7 +564,7 @@ YouTubeDNN 在 6,040 位测试用户上取得：
 迁移完成后的后端测试结果：
 
 ```text
-102 passed
+146 passed
 ```
 
 覆盖范围包括：
