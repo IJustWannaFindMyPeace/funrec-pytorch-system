@@ -202,6 +202,8 @@ Docker Compose 会启动：
 Set-Location .\backend
 ```
 
+以下命令包含 `--reset`，会重置目标数据库中的数据。仅在独立开发数据库中执行。
+
 导入数据库并创建测试用户：
 
 ```powershell
@@ -227,6 +229,8 @@ uv run scripts/index_movies_elasticsearch.py
 ```
 
 ## 运行完整离线流水线
+
+以下命令面向独立的本地开发环境。`--flush-redis` 会清空所连接的 Redis 数据库；预处理、训练和部署可能写入既有产物路径。请使用新的 `FUNREC_PROCESSED_DATA_PATH`，并确认 Redis 不与其他项目共用。
 
 确保 PostgreSQL、Redis 和 Elasticsearch 已启动，然后在 `backend` 目录运行：
 
@@ -492,6 +496,12 @@ git diff --check
 - 排序训练、部署与在线推理
 - Elasticsearch 无连接时的快速降级
 - 推荐服务和召回策略
+
+## 部署范围
+
+仓库提供本地开发与演示配置，不代表可直接面向公网的生产部署。默认数据库凭据、测试账户和 JWT 密钥占位值均为公开开发配置；公网部署前必须替换，配置访问控制并关闭调试模式。
+
+源码仓库不包含可直接运行推理的训练权重、完整数据集或本地 `.env`。克隆后需要准备数据并训练、导出和部署模型。本文的三轮训练命令是运行示例，不代表已验证的收敛预算或效果承诺。
 
 ## 已知行为
 
