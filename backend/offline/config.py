@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# TODO: 这不是一个好的实践方式
+# 路径相对于当前工作目录解析；离线命令需从 backend/ 运行，以加载根目录 .env。
 load_dotenv("../.env")
 
 class Config:
